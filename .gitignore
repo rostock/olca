@@ -1,0 +1,9 @@
+# compiled data and cache
+__pycache__/
+*.py[cod]
+
+# private configuration
+secrets.py
+
+# WSGI scripts
+*.wsgi
