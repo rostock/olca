@@ -2,7 +2,6 @@
 
 
 # application
-
 # required
 DEFAULT_EPSG_IN = 4326
 DEFAULT_EPSG_OUT = 25833
@@ -12,7 +11,6 @@ ACCESS_CONTROL_ALLOW_ORIGIN = '*'
 
 
 # Flask
-
 # optional
 JSON_AS_ASCII = False
 JSON_SORT_KEYS = True
