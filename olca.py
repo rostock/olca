@@ -3,6 +3,7 @@
 from flask import Flask, jsonify, redirect, request
 from flask_compress import Compress
 import openlocationcode as olc
+import urllib
 
 
 
@@ -41,13 +42,18 @@ def request_handler(request, arg_name):
         return request_data[arg_name]
 
 # OLC handler
-def olc_handler(x, y, code, epsg_in, epsg_out):
+def olc_handler(x, y, query, epsg_in, epsg_out):
 
-  # encode queried pair of coordinates if necessary
-  if code is None:
-    code = olc.encode(y, x)
+  # encode queried pair of coordinates if necessary, take query as the Plus code if not
+  code = olc.encode(y, x) if query is None else query
 
-  # decode the full Plus code to calculate the center pair of coordinates and the bbox
+  # take care of short Plus code if necessary
+  code = code.split('+')[0].ljust(8, '0') + '+' if olc.isShort(code) else code
+  
+  # determine the level
+  level = len(code.replace('+', '').rstrip('0')) / 2
+
+  # decode the Plus code to calculate the center pair of coordinates and the bbox
   coord = olc.decode(code)
   center_x = coord.longitudeCenter
   center_y = coord.latitudeCenter
@@ -55,7 +61,10 @@ def olc_handler(x, y, code, epsg_in, epsg_out):
   bbox_sw_y = coord.latitudeLo
   bbox_ne_x = coord.longitudeHi
   bbox_ne_y = coord.latitudeHi
-  
+
+  # get the full Plus code
+  code = olc.encode(center_y, center_x)
+
   # build the bbox
   bbox = [
     [
@@ -66,7 +75,7 @@ def olc_handler(x, y, code, epsg_in, epsg_out):
       [ bbox_sw_x, bbox_sw_y ]
     ]
   ]
-  
+
   # valid GeoJSON
   return {
     'type': 'Feature',
@@ -75,39 +84,44 @@ def olc_handler(x, y, code, epsg_in, epsg_out):
       'center_x': center_x,
       # latitude/y of the center pair of coordinates
       'center_y': center_y,
-      'code': code,
-      # grid level 0 code
-      'code_level_0': code[:2],
       # grid level 1 code
-      'code_level_1': code[:4],
+      'code_level_1': olc.encode(center_y, center_x, 2),
       # grid level 2 code
-      'code_level_2': code[:6],
+      'code_level_2': olc.encode(center_y, center_x, 4),
       # grid level 3 code
-      'code_level_3': code[:9],
+      'code_level_3': olc.encode(center_y, center_x, 6),
+      # grid level 4 code
+      'code_level_4': olc.encode(center_y, center_x, 8),
+      # grid level 5 code
+      'code_level_5': code,
       # local code
       'code_local': code[4:],
+      # short code (depending on the distance between the code center and the reference pair of coordinates)
+      'code_short': olc.shorten(code, y, x) if query is None else olc.shorten(code, center_y, center_x),
       'epsg_in': epsg_in,
-      'epsg_out': epsg_out
+      'epsg_out': epsg_out,
+      # grid level
+      'level': level
     },
     'geometry': {
       'type': 'Polygon',
       'coordinates': bbox
     }
   }
-  
+
 
 # response handler
 def response_handler(data, status):
 
   # always JSON
   response = jsonify(data)
-  
+
   # CORS response header indicating whether the response can be shared with requesting code from the given origin:
   # set to corresponding value if provided in settings
   if 'ACCESS_CONTROL_ALLOW_ORIGIN' in app.config:
     response.headers['Access-Control-Allow-Origin'] = app.config['ACCESS_CONTROL_ALLOW_ORIGIN']
   return response, status
-  
+
 
 
 
@@ -116,20 +130,21 @@ def response_handler(data, status):
 def query():
 
   # globals
-  
+
   # default error message
   message = 'value of required \'query\' parameter is neither a valid pair of coordinates (latitude/y, longitude/x) nor a valid Plus code'
-  
+
   # default HTTP status code
   status = 400
-  
+
   # request handling
 
   # required query parameter, i.e. what to look for:
   # set to corresponding value if provided via request arguments, return an error if not
   handled_request = request_handler(request, 'query')
   if handled_request is not None:
-    query = handled_request
+    # careful with the  the plus sign!
+    query = urllib.unquote(urllib.quote_plus(handled_request))
   else:
     data = { 'message': 'missing required \'query\' parameter or parameter empty', 'status': status }
     return response_handler(data, status)
@@ -149,23 +164,23 @@ def query():
     epsg_out = handled_request
   else:
     epsg_out = app.config['DEFAULT_EPSG_OUT']
-  
+
   # query processing
-  
+
   # return an error if optional EPSG code parameter for queried pair of coordinates is not a number
   try:
     epsg_in = int(epsg_in)
   except ValueError:
     data = { 'message': 'value of optional \'epsg_in\' parameter is not a number', 'status': status }
     return response_handler(data, status)
-  
+
   # return an error if optional EPSG code parameter for returned coordinates is not a number
   try:
     epsg_out = int(epsg_out)
   except ValueError:
     data = { 'message': 'value of optional \'epsg_out\' parameter is not a number', 'status': status }
     return response_handler(data, status)
-  
+
   # required query parameter, i.e. what to look for:
   # encode queried pair of coordinates if they are valid, return an error if not
   if ',' in query:
@@ -179,9 +194,7 @@ def query():
   # decode queried Plus code if it is valid, return an error if not
   else:
     try:
-      # handle the plus sign correctly
-      code = query.replace(' ', '+')
-      data = olc_handler(None, None, code, epsg_in, epsg_out)
+      data = olc_handler(None, None, query, epsg_in, epsg_out)
       return response_handler(data, 200)
     except:
       data = { 'message': message, 'status': status }
