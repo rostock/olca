@@ -2,8 +2,18 @@
 
 from flask import Flask, jsonify, redirect, request
 from flask_compress import Compress
+from urllib import quote_plus, unquote
 import openlocationcode as olc
-import urllib
+import pyproj as p
+
+
+
+# global constants
+HTTP_OK_STATUS_ = 200
+HTTP_ERROR_STATUS_ = 400
+DEFAULT_ERROR_MESSAGE_ = 'value of required \'query\' parameter is neither a valid pair of coordinates (required order: latitude/y,longitude/x) nor a valid Plus code'
+COORDINATE_SEPARATOR_ = ','
+OLC_EPSG_ = 4326
 
 
 
@@ -41,29 +51,54 @@ def request_handler(request, arg_name):
       if request.method == 'POST' and request_data is not None and arg_name in request_data:
         return request_data[arg_name]
 
-# OLC handler
-def olc_handler(x, y, query, epsg_in, epsg_out):
+# EPSG transformation handler
+def epsg_handler(epsg_in, epsg_out, source_x, source_y):
 
-  # encode queried pair of coordinates if necessary, take query as the Plus code if not
-  code = olc.encode(y, x) if query is None else query
+  source_projection = p.Proj(init = 'epsg:' + str(epsg_in)) if epsg_out is None else p.Proj(init = 'epsg:' + str(OLC_EPSG_))
+  target_projection = p.Proj(init = 'epsg:' + str(OLC_EPSG_)) if epsg_out is None else p.Proj(init = 'epsg:' + str(epsg_out))
+  return p.transform(source_projection, target_projection, source_x, source_y)
+
+# Open Location Code (OLC) handler
+def olc_handler(x, y, query, epsg_in, epsg_out):
+  
+  # if a pair of coordinates was queried...
+  if query is None:
+    # transform if EPSG code of queried pair of coordinates is not equal to default EPSG code of OLC
+    if epsg_in != OLC_EPSG_:
+      try:
+        x, y = epsg_handler(epsg_in, None, x, y)
+      except:
+        return { 'message': 'transformation of provided pair of coordinates (required order: latitude/y,longitude/x) not possible', 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
+    # encode queried pair of coordinates
+    code = olc.encode(y, x)
+  # if not...
+  else:
+    # take query as the Plus code
+    code = query
 
   # take care of short Plus code if necessary
-  code = code.split('+')[0].ljust(8, '0') + '+' if olc.isShort(code) else code
+  code = code.split(olc.SEPARATOR_)[0].ljust(8, olc.PADDING_CHARACTER_) + olc.SEPARATOR_ if olc.isShort(code) else code
   
   # determine the level
-  level = len(code.replace('+', '').rstrip('0')) / 2
+  level = len(code.replace(olc.SEPARATOR_, '').rstrip(olc.PADDING_CHARACTER_)) / 2
 
   # decode the Plus code to calculate the center pair of coordinates and the bbox
   coord = olc.decode(code)
-  center_x = coord.longitudeCenter
-  center_y = coord.latitudeCenter
-  bbox_sw_x = coord.longitudeLo
-  bbox_sw_y = coord.latitudeLo
-  bbox_ne_x = coord.longitudeHi
-  bbox_ne_y = coord.latitudeHi
+  center_x, center_y = coord.longitudeCenter, coord.latitudeCenter
+  bbox_sw_x, bbox_sw_y = coord.longitudeLo, coord.latitudeLo
+  bbox_ne_x, bbox_ne_y = coord.longitudeHi, coord.latitudeHi
 
   # get the full Plus code
   code = olc.encode(center_y, center_x)
+  
+  # transform all pairs of coordinates to be returned if EPSG necessary
+  if epsg_out != OLC_EPSG_:
+    try:
+      center_x, center_y = epsg_handler(None, epsg_out, center_x, center_y)
+      bbox_sw_x, bbox_sw_y = epsg_handler(None, epsg_out, bbox_sw_x, bbox_sw_y)
+      bbox_ne_x, bbox_ne_y = epsg_handler(None, epsg_out, bbox_ne_x, bbox_ne_y)
+    except Exception as e:
+      return { 'message': str(e), 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
 
   # build the bbox
   bbox = [
@@ -85,19 +120,19 @@ def olc_handler(x, y, query, epsg_in, epsg_out):
       # latitude/y of the center pair of coordinates
       'center_y': center_y,
       # grid level 1 code
-      'code_level_1': olc.encode(center_y, center_x, 2),
+      'code_level_1': olc.encode(coord.latitudeCenter, coord.longitudeCenter, 2),
       # grid level 2 code
-      'code_level_2': olc.encode(center_y, center_x, 4),
+      'code_level_2': olc.encode(coord.latitudeCenter, coord.longitudeCenter, 4),
       # grid level 3 code
-      'code_level_3': olc.encode(center_y, center_x, 6),
+      'code_level_3': olc.encode(coord.latitudeCenter, coord.longitudeCenter, 6),
       # grid level 4 code
-      'code_level_4': olc.encode(center_y, center_x, 8),
+      'code_level_4': olc.encode(coord.latitudeCenter, coord.longitudeCenter, 8),
       # grid level 5 code
       'code_level_5': code,
       # local code
       'code_local': code[4:],
       # short code (depending on the distance between the code center and the reference pair of coordinates)
-      'code_short': olc.shorten(code, y, x) if query is None else olc.shorten(code, center_y, center_x),
+      'code_short': olc.shorten(code, y, x) if query is None else olc.shorten(code, coord.latitudeCenter, coord.longitudeCenter),
       'epsg_in': epsg_in,
       'epsg_out': epsg_out,
       # grid level
@@ -107,8 +142,7 @@ def olc_handler(x, y, query, epsg_in, epsg_out):
       'type': 'Polygon',
       'coordinates': bbox
     }
-  }
-
+  }, HTTP_OK_STATUS_
 
 # response handler
 def response_handler(data, status):
@@ -129,14 +163,6 @@ def response_handler(data, status):
 @app.route('/', methods=['GET', 'POST'])
 def query():
 
-  # globals
-
-  # default error message
-  message = 'value of required \'query\' parameter is neither a valid pair of coordinates (latitude/y, longitude/x) nor a valid Plus code'
-
-  # default HTTP status code
-  status = 400
-
   # request handling
 
   # required query parameter, i.e. what to look for:
@@ -144,10 +170,10 @@ def query():
   handled_request = request_handler(request, 'query')
   if handled_request is not None:
     # careful with the  the plus sign!
-    query = urllib.unquote(urllib.quote_plus(handled_request))
+    query = unquote(quote_plus(handled_request))
   else:
-    data = { 'message': 'missing required \'query\' parameter or parameter empty', 'status': status }
-    return response_handler(data, status)
+    data = { 'message': 'missing required \'query\' parameter or parameter empty', 'status': HTTP_ERROR_STATUS_ }
+    return response_handler(data, HTTP_ERROR_STATUS_)
 
   # optional EPSG code parameter for queried pair of coordinates:
   # set to corresponding value if provided via request arguments, set to corresponding default value in settings if not
@@ -157,7 +183,7 @@ def query():
   else:
     epsg_in = app.config['DEFAULT_EPSG_IN']
 
-  # optional EPSG code parameter for returned pair of coordinates:
+  # optional EPSG code parameter for all returned pairs of coordinates:
   # set to corresponding value if provided via request arguments, set to corresponding default value in settings if not
   handled_request = request_handler(request, 'epsg_out')
   if handled_request is not None:
@@ -171,62 +197,69 @@ def query():
   try:
     epsg_in = int(epsg_in)
   except ValueError:
-    data = { 'message': 'value of optional \'epsg_in\' parameter is not a number', 'status': status }
-    return response_handler(data, status)
+    data = { 'message': 'value of optional \'epsg_in\' parameter is not a number', 'status': HTTP_ERROR_STATUS_ }
+    return response_handler(data, HTTP_ERROR_STATUS_)
 
-  # return an error if optional EPSG code parameter for returned coordinates is not a number
+  # return an error if optional EPSG code parameter for all returned pairs of coordinates is not a number
   try:
     epsg_out = int(epsg_out)
   except ValueError:
-    data = { 'message': 'value of optional \'epsg_out\' parameter is not a number', 'status': status }
-    return response_handler(data, status)
+    data = { 'message': 'value of optional \'epsg_out\' parameter is not a number', 'status': HTTP_ERROR_STATUS_ }
+    return response_handler(data, HTTP_ERROR_STATUS_)
 
   # required query parameter, i.e. what to look for:
   # encode queried pair of coordinates if they are valid, return an error if not
-  if ',' in query:
-    query = query.split(',')
+  if COORDINATE_SEPARATOR_ in query:
+    query = query.split(COORDINATE_SEPARATOR_)
     try:
-      data = olc_handler(float(query[1]), float(query[0]), None, epsg_in, epsg_out)
-      return response_handler(data, 200)
-    except:
-      data = { 'message': message, 'status': status }
+      data, status = olc_handler(float(query[1]), float(query[0]), None, epsg_in, epsg_out)
       return response_handler(data, status)
+    except:
+      data = { 'message': DEFAULT_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
+      return response_handler(data, HTTP_ERROR_STATUS_)
   # decode queried Plus code if it is valid, return an error if not
   else:
     try:
-      data = olc_handler(None, None, query, epsg_in, epsg_out)
-      return response_handler(data, 200)
-    except:
-      data = { 'message': message, 'status': status }
+      data, status = olc_handler(None, None, query, epsg_in, epsg_out)
       return response_handler(data, status)
+    except:
+      data = { 'message': DEFAULT_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
+      return response_handler(data, HTTP_ERROR_STATUS_)
 
 
 
 # custom error handling
-@app.errorhandler(403)
-def error_403(error):
-  return redirect(app.config['REDIRECT_URL_403'])
+if 'REDIRECT_URL_403' in app.config:
+  @app.errorhandler(403)
+  def error_403(error):
+    return redirect(app.config['REDIRECT_URL_403'])
 
-@app.errorhandler(404)
-def error_404(error):
-  return redirect(app.config['REDIRECT_URL_404'])
+if 'REDIRECT_URL_404' in app.config:
+  @app.errorhandler(404)
+  def error_404(error):
+    return redirect(app.config['REDIRECT_URL_404'])
 
-@app.errorhandler(410)
-def error_410(error):
-  return redirect(app.config['REDIRECT_URL_410'])
+if 'REDIRECT_URL_410' in app.config:
+  @app.errorhandler(410)
+  def error_410(error):
+    return redirect(app.config['REDIRECT_URL_410'])
 
-@app.errorhandler(500)
-def error_500(error):
-  return redirect(app.config['REDIRECT_URL_500'])
+if 'REDIRECT_URL_500' in app.config:
+  @app.errorhandler(500)
+  def error_500(error):
+    return redirect(app.config['REDIRECT_URL_500'])
 
-@app.errorhandler(501)
-def error_501(error):
-  return redirect(app.config['REDIRECT_URL_501'])
+if 'REDIRECT_URL_501' in app.config:
+  @app.errorhandler(501)
+  def error_501(error):
+    return redirect(app.config['REDIRECT_URL_501'])
 
-@app.errorhandler(502)
-def error_502(error):
-  return redirect(app.config['REDIRECT_URL_502'])
+if 'REDIRECT_URL_502' in app.config:
+  @app.errorhandler(502)
+  def error_502(error):
+    return redirect(app.config['REDIRECT_URL_502'])
 
-@app.errorhandler(503)
-def error_503(error):
-  return redirect(app.config['REDIRECT_URL_503'])
+if 'REDIRECT_URL_503' in app.config:
+  @app.errorhandler(503)
+  def error_503(error):
+    return redirect(app.config['REDIRECT_URL_503'])

@@ -57,3 +57,115 @@ If you want to deploy OLCA with [*Apache HTTP Server*](https://httpd.apache.org)
             Order deny,allow
             Require all granted
         </Directory>
+
+## Usage
+
+Provided that *OLCA* is running under `/olca`, the base URL of the API is `/olca/?`.
+
+### Request methods
+
+*OLCA* supports HTTP `GET` requests with all parameters passed in the query string. The API also supports HTTP `POST` requests with all parameters passed either via form data (i.e. `Content-Type: application/x-www-form-urlencoded`) or in a JSON body (i.e. `Content-Type: application/json`).
+
+All HTTP request methods share the same parameter names. The parameter names and values are case-sensitive.
+
+Example HTTP `GET` request:
+
+        curl 'http://127.0.0.1/olca/?query=9F6J33VX+55&epsg_out=2398'
+
+The same example as an HTTP `POST` request with form data:
+
+        curl -X POST --data 'query=9F6J33VX+55&epsg_out=2398' http://127.0.0.1/olca/
+
+The same example as an HTTP `POST` request with JSON body:
+
+        curl -X POST -H 'Content-Type: application/json' --data '{ "query": "9F6J33VX+55", "epsg_out": 2398}' http://127.0.0.1/olca/
+
+### Responses
+
+*OLCA* always responds with a valid JSON document.
+
+#### Error
+
+A valid JSON document with `status` and `message` is returned in case of any error. The `status` is identical to the returned HTTP status.
+
+Example HTTP `GET` request with missing parameter:
+
+        curl 'http://127.0.0.1/olca/?epsg_out=2398'
+
+And the corresponding JSON response:
+
+        {
+          "message": "missing required 'query' parameter or parameter empty",
+          "status": 400
+        }
+
+#### Success
+
+Successful requests result in a valid GeoJSON document with exactly one `Feature` containing properties and a geometry of type `Polygon`.
+
+Example successful HTTP `POST` request with JSON body:
+
+        curl -X POST -H 'Content-Type: application/json' --data '{ "query": "5997753,310224", "epsg_in": 25833, "epsg_out": 2398}' http://127.0.0.1/olca/
+
+And the corresponding GeoJSON response:
+
+        {
+          "geometry": {
+            "coordinates": [
+              [
+                [
+                  4506527.742360309,
+                  5996406.554493488
+                ],
+                [
+                  4506535.901855983,
+                  5996406.554493488
+                ],
+                [
+                  4506535.901855983,
+                  5996420.479254515
+                ],
+                [
+                  4506527.742360309,
+                  5996420.479254515
+                ],
+                [
+                  4506527.742360309,
+                  5996406.554493488
+                ]
+              ]
+            ],
+            "type": "Polygon"
+          },
+          "properties": {
+            "center_x": 4506531.822114297,
+            "center_y": 5996413.516872162,
+            "code_level_1": "9F000000+",
+            "code_level_2": "9F6J0000+",
+            "code_level_3": "9F6J3300+",
+            "code_level_4": "9F6J33VX+",
+            "code_level_5": "9F6J33VX+55",
+            "code_local": "33VX+55",
+            "code_short": "+55",
+            "epsg_in": 4326,
+            "epsg_out": 2398,
+            "level": 5
+          },
+          "type": "Feature"
+        }
+
+### Parameters
+
+The following parameters are valid for all requests:
+
+| Name | Example(s) | Description | Required | Default |
+| --- | --- | --- | --- | --- |
+| `query` | `9F6J33VX+55` or `9F6J33+` or `9F000000+` or `54.092,12.098` or `5997644,310223` | the query string: either a valid pair of coordinates (**required order**: latitude/y,longitude/x) or a valid *Plus code* | yes | / |
+| `epsg_in` | `4326` or `25833` | the EPSG code for all returned pairs of coordinates | no | as configured in `settings.py` |
+| `epsg_out` | `25833` or `2398` | the EPSG code for all returned pairs of coordinates | no | as configured in `settings.py` |
+
+### Cross-Origin Resource Sharing
+
+By default, browsers, for security reasons, do not allow making API calls to a different domain.
+
+Depending on the configuration in `settings.py`, *OLCA* sends an `Access-Control-Allow-Origin: '*'` header with each response to allow this Cross-Origin Resource Sharing. This header is [supported by most browsers](https://caniuse.com/#search=cors).
