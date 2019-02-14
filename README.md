@@ -16,7 +16,7 @@ A web API for converting coordinates to [*Plus codes*](https://plus.codes) of th
         
 1.  Clone the project:
 
-        git clone https://github.com/rostock/OLCA /usr/local/olca/olca
+        git clone https://github.com/rostock/olca /usr/local/olca/olca
         
 1.  Activate the virtual *Python* environment:
 
@@ -64,7 +64,7 @@ Provided that *OLCA* is running under `/olca`, the base URL of the API is `/olca
 
 ### Request methods
 
-*OLCA* supports HTTP `GET` requests with all parameters passed in the query string. The API also supports HTTP `POST` requests with all parameters passed either via form data (i.e. `Content-Type: application/x-www-form-urlencoded`) or in a JSON body (i.e. `Content-Type: application/json`).
+*OLCA* supports HTTP `GET` requests with all parameters passed in the query string. The API also supports HTTP `POST` requests with all parameters passed either via form data (i.e. `Content-Type: application/x-www-form-urlencoded`) or in a [JSON](https://www.json.org) body (i.e. `Content-Type: application/json`).
 
 All HTTP request methods share the same parameter names. The parameter names and values are case-sensitive.
 
@@ -101,7 +101,7 @@ And the corresponding JSON response:
 
 #### Success
 
-Successful requests result in a valid GeoJSON document with exactly one `Feature` containing properties and a geometry of type `Polygon`.
+Successful requests result in a valid [GeoJSON](http://geojson.org) document with exactly one `Feature` containing properties and a geometry of type `Polygon`.
 
 Example successful HTTP `POST` request with JSON body:
 
@@ -161,7 +161,7 @@ The following parameters are valid for all requests:
 | Name | Example(s) | Description | Required | Default |
 | --- | --- | --- | --- | --- |
 | `query` | `9F6J33VX+55` or `9F6J33+` or `9F000000+` or `54.092,12.098` or `5997644,310223` | the query string: either a valid pair of coordinates (**required order**: latitude/y,longitude/x) or a valid *Plus code* | yes | / |
-| `epsg_in` | `4326` or `25833` | the EPSG code for all returned pairs of coordinates | no | as configured in `settings.py` |
+| `epsg_in` | `4326` or `25833` | the [EPSG code](http://www.epsg.org) for all returned pairs of coordinates | no | as configured in `settings.py` |
 | `epsg_out` | `25833` or `2398` | the EPSG code for all returned pairs of coordinates | no | as configured in `settings.py` |
 
 ### Cross-Origin Resource Sharing
