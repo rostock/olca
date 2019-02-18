@@ -17,10 +17,10 @@ FILE_NAME_SUFFIX = '.csv'
 LEVEL = 5
 
 # bboxes will be created within this extent
-MIN_X = 10.0
-MIN_Y = 52.5
-MAX_X = 15
-MAX_Y = 55
+MIN_X = 12
+MIN_Y = 54
+MAX_X = 12.35
+MAX_Y = 54.3
 
 
 
@@ -32,15 +32,18 @@ LEVEL_RESOLUTION_ = olc.PAIR_RESOLUTIONS_[LEVEL - 1]
 
 
 # global variables
+
+# precision of level resolution
+level_resolution_precision = len(str(LEVEL_RESOLUTION_ - int(LEVEL_RESOLUTION_))[2:])
   
 # calculate the number of lines (of bboxes to be created)
-num_lines = int(math.ceil((float(MAX_Y) - float(MIN_Y)) / float(LEVEL_RESOLUTION_)))
+num_lines = int(math.ceil((round(round(MAX_Y, level_resolution_precision) - round(MIN_Y, level_resolution_precision), level_resolution_precision)) / float(LEVEL_RESOLUTION_)))
 
 # how many digits in the number of lines? just to get nicer filenames later on...
 num_digits_in_num_lines = len(str(num_lines))
 
 # calculate the number of rows (of bboxes to be created)
-num_rows = int(math.ceil((float(MAX_X) - float(MIN_X)) / float(LEVEL_RESOLUTION_)))
+num_rows = int(math.ceil((round(round(MAX_X, level_resolution_precision) - round(MIN_X, level_resolution_precision), level_resolution_precision)) / float(LEVEL_RESOLUTION_)))
 
 # how many bboxes are (hopefully) to be created?
 num_bboxes = num_lines * num_rows
@@ -57,13 +60,13 @@ if not os.path.exists(TARGET_FOLDER):
 # calculations
 
 # initial counter (needed for progress information output)
-counter = 1
+counter = 0
 
-# loop through all lines (0-based, therefore 1 more than number of lines)
-for line in range(num_lines + 1):
+# loop through all lines
+for line in range(num_lines):
 
   # calculate current y
-  y = MIN_Y + (LEVEL_RESOLUTION_ * line)
+  y = float(MIN_Y) + (float(LEVEL_RESOLUTION_) * float(line))
 
   # create a new file in target folder and open it for write access
   file_name = FILE_NAME_PREFIX + str(line).rjust(num_digits_in_num_lines, '0') + FILE_NAME_SUFFIX
@@ -72,11 +75,11 @@ for line in range(num_lines + 1):
   # write header with column names to file
   temp_file.write('code;bbox\n')
 
-  # loop through all rows (0-based, therefore 1 more than number of rows)
-  for row in range(num_rows + 1):
+  # loop through all rows
+  for row in range(num_rows):
 
     # calculate current x
-    x = MIN_X + (LEVEL_RESOLUTION_ * row)
+    x = float(MIN_X) + (float(LEVEL_RESOLUTION_) * float(row))
 
     # get the full Plus code related to current x and y
     code = olc.encode(y, x)
