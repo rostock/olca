@@ -14,6 +14,7 @@ HTTP_ERROR_STATUS_ = 400
 DEFAULT_ERROR_MESSAGE_ = 'value of required \'query\' parameter is neither a valid pair of coordinates (required order: latitude/y,longitude/x) nor a valid Plus code'
 COORDINATE_SEPARATOR_ = ','
 OLC_EPSG_ = 4326
+OLC_PRECISION_ = len(str(0.000125)[2:])
 
 
 
@@ -91,7 +92,7 @@ def olc_handler(x, y, query, epsg_in, epsg_out):
   # get the full Plus code
   code = olc.encode(center_y, center_x)
   
-  # transform all pairs of coordinates to be returned if EPSG necessary
+  # transform all pairs of coordinates to be returned if EPSG necessary, round to six decimals if not
   if epsg_out != OLC_EPSG_:
     try:
       center_x, center_y = epsg_handler(None, epsg_out, center_x, center_y)
@@ -99,6 +100,10 @@ def olc_handler(x, y, query, epsg_in, epsg_out):
       bbox_ne_x, bbox_ne_y = epsg_handler(None, epsg_out, bbox_ne_x, bbox_ne_y)
     except Exception as e:
       return { 'message': str(e), 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
+  else:
+    center_x, center_y = round(center_x, OLC_PRECISION_), round(center_y, OLC_PRECISION_)
+    bbox_sw_x, bbox_sw_y = round(bbox_sw_x, OLC_PRECISION_), round(bbox_sw_y, OLC_PRECISION_)
+    bbox_ne_x, bbox_ne_y = round(bbox_ne_x, OLC_PRECISION_), round(bbox_ne_y, OLC_PRECISION_)
 
   # build the bbox
   bbox = [
@@ -111,33 +116,36 @@ def olc_handler(x, y, query, epsg_in, epsg_out):
     ]
   ]
 
+  # build the properties
+  properties = {
+    # longitude/x of the center pair of coordinates
+    'center_x': center_x,
+    # latitude/y of the center pair of coordinates
+    'center_y': center_y,
+    # grid level 1 code
+    'code_level_1': olc.encode(coord.latitudeCenter, coord.longitudeCenter, 2),
+    'epsg_in': epsg_in,
+    'epsg_out': epsg_out,
+    # grid level
+    'level': level
+  }
+  if level > 1:
+    # grid level 2 code
+    properties.update( { 'code_level_2': olc.encode(coord.latitudeCenter, coord.longitudeCenter, 4) } )
+  if level > 2:
+    # grid level 3 code
+    properties.update( { 'code_level_3': olc.encode(coord.latitudeCenter, coord.longitudeCenter, 6) } )
+  if level > 3:
+    # grid level 4 code
+    properties.update( { 'code_level_4': olc.encode(coord.latitudeCenter, coord.longitudeCenter, 8) } )
+  if level > 4:
+    # grid level 5 code, local code and short code (depending on the distance between the code center and the reference pair of coordinates)
+    properties.update( { 'code_level_5': code, 'code_local': code[4:], 'code_short': olc.shorten(code, y, x) if query is None else olc.shorten(code, coord.latitudeCenter, coord.longitudeCenter) } )
+
   # valid GeoJSON
   return {
     'type': 'Feature',
-    'properties': {
-      # longitude/x of the center pair of coordinates
-      'center_x': center_x,
-      # latitude/y of the center pair of coordinates
-      'center_y': center_y,
-      # grid level 1 code
-      'code_level_1': olc.encode(coord.latitudeCenter, coord.longitudeCenter, 2),
-      # grid level 2 code
-      'code_level_2': olc.encode(coord.latitudeCenter, coord.longitudeCenter, 4),
-      # grid level 3 code
-      'code_level_3': olc.encode(coord.latitudeCenter, coord.longitudeCenter, 6),
-      # grid level 4 code
-      'code_level_4': olc.encode(coord.latitudeCenter, coord.longitudeCenter, 8),
-      # grid level 5 code
-      'code_level_5': code,
-      # local code
-      'code_local': code[4:],
-      # short code (depending on the distance between the code center and the reference pair of coordinates)
-      'code_short': olc.shorten(code, y, x) if query is None else olc.shorten(code, coord.latitudeCenter, coord.longitudeCenter),
-      'epsg_in': epsg_in,
-      'epsg_out': epsg_out,
-      # grid level
-      'level': level
-    },
+    'properties': properties,
     'geometry': {
       'type': 'Polygon',
       'coordinates': bbox

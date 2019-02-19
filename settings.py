@@ -8,7 +8,7 @@
 # default EPSG code for queried pair of coordinates (default EPSG code of OLC: 4326)
 DEFAULT_EPSG_IN = 4326
 # default EPSG code for all returned pairs of coordinates
-DEFAULT_EPSG_OUT = 25833
+DEFAULT_EPSG_OUT = 4326
 
 # optional
 

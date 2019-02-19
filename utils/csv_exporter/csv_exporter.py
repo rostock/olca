@@ -29,6 +29,9 @@ MAX_Y = 54.3
 # resolution value in degrees for level configured above in the OLC encoding
 LEVEL_RESOLUTION_ = olc.PAIR_RESOLUTIONS_[LEVEL - 1]
 
+# buffer in degrees to prevent multiple calculation of bboxes
+BUFFER_ = .000001
+
 
 
 # global variables
@@ -37,13 +40,13 @@ LEVEL_RESOLUTION_ = olc.PAIR_RESOLUTIONS_[LEVEL - 1]
 level_resolution_precision = len(str(LEVEL_RESOLUTION_ - int(LEVEL_RESOLUTION_))[2:])
   
 # calculate the number of lines (of bboxes to be created)
-num_lines = int(math.ceil((round(round(MAX_Y, level_resolution_precision) - round(MIN_Y, level_resolution_precision), level_resolution_precision)) / float(LEVEL_RESOLUTION_)))
+num_lines = int(math.ceil((round(round(MAX_Y, level_resolution_precision) - round(MIN_Y, level_resolution_precision), level_resolution_precision)) / LEVEL_RESOLUTION_))
 
 # how many digits in the number of lines? just to get nicer filenames later on...
 num_digits_in_num_lines = len(str(num_lines))
 
 # calculate the number of rows (of bboxes to be created)
-num_rows = int(math.ceil((round(round(MAX_X, level_resolution_precision) - round(MIN_X, level_resolution_precision), level_resolution_precision)) / float(LEVEL_RESOLUTION_)))
+num_rows = int(math.ceil((round(round(MAX_X, level_resolution_precision) - round(MIN_X, level_resolution_precision), level_resolution_precision)) / LEVEL_RESOLUTION_))
 
 # how many bboxes are (hopefully) to be created?
 num_bboxes = num_lines * num_rows
@@ -66,7 +69,7 @@ counter = 0
 for line in range(num_lines):
 
   # calculate current y
-  y = float(MIN_Y) + (float(LEVEL_RESOLUTION_) * float(line))
+  y = MIN_Y + (LEVEL_RESOLUTION_ * line) + BUFFER_
 
   # create a new file in target folder and open it for write access
   file_name = FILE_NAME_PREFIX + str(line).rjust(num_digits_in_num_lines, '0') + FILE_NAME_SUFFIX
@@ -79,7 +82,7 @@ for line in range(num_lines):
   for row in range(num_rows):
 
     # calculate current x
-    x = float(MIN_X) + (float(LEVEL_RESOLUTION_) * float(row))
+    x = MIN_X + (LEVEL_RESOLUTION_ * row) + BUFFER_
 
     # get the full Plus code related to current x and y
     code = olc.encode(y, x)
