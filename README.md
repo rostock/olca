@@ -70,15 +70,15 @@ All HTTP request methods share the same parameter names. The parameter names and
 
 Example HTTP `GET` request:
 
-        curl 'http://127.0.0.1/olca/?query=9F6J33VX+55&epsg_out=2398'
+        curl 'http://127.0.0.1/olca/?query=9F6J33VX+55&epsg_out=25833'
 
 The same example as an HTTP `POST` request with form data:
 
-        curl -X POST --data 'query=9F6J33VX+55&epsg_out=2398' http://127.0.0.1/olca/
+        curl -X POST --data 'query=9F6J33VX+55&epsg_out=25833' http://127.0.0.1/olca/
 
 The same example as an HTTP `POST` request with JSON body:
 
-        curl -X POST -H 'Content-Type: application/json' --data '{ "query": "9F6J33VX+55", "epsg_out": 2398}' http://127.0.0.1/olca/
+        curl -X POST -H 'Content-Type: application/json' --data '{ "query": "9F6J33VX+55", "epsg_out": 25833}' http://127.0.0.1/olca/
 
 ### Responses
 
@@ -90,7 +90,7 @@ A valid JSON document with `status` and `message` is returned in case of any err
 
 Example HTTP `GET` request with missing parameter:
 
-        curl 'http://127.0.0.1/olca/?epsg_out=2398'
+        curl 'http://127.0.0.1/olca/?epsg_out=25833'
 
 And the corresponding JSON response:
 
@@ -147,7 +147,7 @@ And the corresponding GeoJSON response:
             "code_level_5": "9F6J33VX+55",
             "code_local": "33VX+55",
             "code_short": "+55",
-            "epsg_in": 4326,
+            "epsg_in": 25833,
             "epsg_out": 2398,
             "level": 5
           },
