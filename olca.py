@@ -11,7 +11,7 @@ import pyproj as p
 # global constants
 HTTP_OK_STATUS_ = 200
 HTTP_ERROR_STATUS_ = 400
-DEFAULT_ERROR_MESSAGE_ = 'value of required \'query\' parameter is neither a valid pair of coordinates (required order: latitude/y,longitude/x) nor a valid Plus code'
+DEFAULT_ERROR_MESSAGE_ = 'value of required \'query\' parameter is neither a valid pair of coordinates (required order: longitude/x,latitude/y) nor a valid Plus code'
 COORDINATE_SEPARATOR_ = ','
 OLC_EPSG_ = 4326
 OLC_PRECISION_ = len(str(0.000125)[2:])
@@ -69,7 +69,7 @@ def olc_handler(x, y, query, epsg_in, epsg_out):
       try:
         x, y = epsg_handler(epsg_in, None, x, y)
       except:
-        return { 'message': 'transformation of provided pair of coordinates (required order: latitude/y,longitude/x) not possible', 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
+        return { 'message': 'transformation of provided pair of coordinates (required order: longitude/x,latitude/y) not possible', 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
     # encode queried pair of coordinates
     code = olc.encode(y, x)
   # if not...
@@ -220,7 +220,7 @@ def query():
   if COORDINATE_SEPARATOR_ in query:
     query = query.split(COORDINATE_SEPARATOR_)
     try:
-      data, status = olc_handler(float(query[1]), float(query[0]), None, epsg_in, epsg_out)
+      data, status = olc_handler(float(query[0]), float(query[1]), None, epsg_in, epsg_out)
       return response_handler(data, status)
     except:
       data = { 'message': DEFAULT_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }

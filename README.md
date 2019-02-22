@@ -105,7 +105,7 @@ Successful requests result in a valid [GeoJSON](http://geojson.org) document wit
 
 Example successful HTTP `POST` request with JSON body:
 
-        curl -X POST -H 'Content-Type: application/json' --data '{ "query": "5997753,310224", "epsg_in": 25833, "epsg_out": 2398}' http://127.0.0.1/olca/
+        curl -X POST -H 'Content-Type: application/json' --data '{ "query": "310224,5997753", "epsg_in": 25833, "epsg_out": 2398}' http://127.0.0.1/olca/
 
 And the corresponding GeoJSON response:
 
@@ -160,7 +160,7 @@ The following parameters are valid for all requests:
 
 | Name | Example(s) | Description | Required | Default |
 | --- | --- | --- | --- | --- |
-| `query` | `9F6J33VX+55` or `9F6J33+` or `9F000000+` or `54.092,12.098` or `5997644,310223` | the query string: either a valid pair of coordinates (**required order**: latitude/y,longitude/x) or a valid *Plus code* | yes | / |
+| `query` | `9F6J33VX+55` or `9F6J33+` or `9F000000+` or `12.098,54.092` or `310223,5997644` | the query string: either a valid pair of coordinates (**required order**: longitude/x,latitude/y) or a valid *Plus code* | yes | / |
 | `epsg_in` | `4326` or `25833` | the [EPSG code](http://www.epsg.org) for all returned pairs of coordinates | no | as configured in `settings.py` |
 | `epsg_out` | `25833` or `2398` | the EPSG code for all returned pairs of coordinates | no | as configured in `settings.py` |
 
