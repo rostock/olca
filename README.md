@@ -28,6 +28,11 @@ A web API for converting coordinates to [*Plus codes*](https://plus.codes) of th
 
 ## Configuration
 
+1.  Create a new secret settings file by copying the template for it:
+
+        cp /usr/local/olca/olca/secrets.template /usr/local/olca/olca/secrets.py
+        
+1.  Edit the secret settings file 
 1.  Edit the general settings file `/usr/local/olca/olca/settings.py`
 
 ## Deployment
@@ -146,6 +151,7 @@ And the corresponding GeoJSON response:
             "code_level_4": "9F6J33VX+",
             "code_level_5": "9F6J33VX+55",
             "code_local": "33VX+55",
+            "code_regional": "33VX+55, Rostock",
             "code_short": "+55",
             "epsg_in": 25833,
             "epsg_out": 2398,
@@ -160,7 +166,7 @@ The following parameters are valid for all requests:
 
 | Name | Example(s) | Description | Required | Default |
 | --- | --- | --- | --- | --- |
-| `query` | `9F6J33VX+55` or `9F6J33+` or `9F000000+` or `12.098,54.092` or `310223,5997644` | the query string: either a valid pair of coordinates (**required order**: longitude/x,latitude/y) or a valid *Plus code* | yes | / |
+| `query` | `9F6J33VX+55` or `9F6J33+` or `9F000000+` or `33VX+55, Rostock` or `rostock,33VX+55` or `12.098,54.092` or `310223,5997644` | the query string: either a valid *Plus code* (**two variants possible:** the pure code or a regional code containing a municipality name, separated from the code with a comma) or a valid pair of coordinates (**required order:** longitude/x,latitude/y) or | yes | / |
 | `epsg_in` | `4326` or `25833` | the [EPSG code](http://www.epsg.org) for all returned pairs of coordinates | no | as configured in `settings.py` |
 | `epsg_out` | `25833` or `2398` | the EPSG code for all returned pairs of coordinates | no | as configured in `settings.py` |
 

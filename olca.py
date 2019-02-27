@@ -5,6 +5,7 @@ from flask_compress import Compress
 from urllib import quote_plus, unquote
 import openlocationcode as olc
 import pyproj as p
+import requests as req
 
 
 
@@ -12,7 +13,7 @@ import pyproj as p
 HTTP_OK_STATUS_ = 200
 HTTP_ERROR_STATUS_ = 400
 DEFAULT_ERROR_MESSAGE_ = 'value of required \'query\' parameter is neither a valid pair of coordinates (required order: longitude/x,latitude/y) nor a valid Plus code'
-COORDINATE_SEPARATOR_ = ','
+SEPARATOR_ = ','
 OLC_EPSG_ = 4326
 OLC_PRECISION_ = len(str(0.000125)[2:])
 
@@ -23,7 +24,8 @@ app = Flask(__name__)
 
 
 
-# import configuration from file
+# import configurations from files
+app.config.from_pyfile('secrets.py', silent = True)
 app.config.from_pyfile('settings.py', silent = True)
 
 
@@ -60,7 +62,16 @@ def epsg_handler(epsg_in, epsg_out, source_x, source_y):
   return p.transform(source_projection, target_projection, source_x, source_y)
 
 # Open Location Code (OLC) handler
-def olc_handler(x, y, query, epsg_in, epsg_out):
+def olc_handler(x, y, query, epsg_in, epsg_out, code_regional):
+
+  # if necessary...
+  if code_regional:
+    # decode queried regional Plus code if it is valid, return an error if not
+    municipality_centroid_x, municipality_centroid_y = municipality_forward_handler(query[1])
+    try:
+      query = olc.recoverNearest(query[0], municipality_centroid_y, municipality_centroid_x)
+    except:
+      return { 'message': 'provided regional Plus code is not valid', 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
   
   # if a pair of coordinates was queried...
   if query is None:
@@ -140,7 +151,11 @@ def olc_handler(x, y, query, epsg_in, epsg_out):
     properties.update( { 'code_level_4': olc.encode(coord.latitudeCenter, coord.longitudeCenter, 8) } )
   if level > 4:
     # grid level 5 code, local code and short code (depending on the distance between the code center and the reference pair of coordinates)
-    properties.update( { 'code_level_5': code, 'code_local': code[4:], 'code_short': olc.shorten(code, y, x) if query is None else olc.shorten(code, coord.latitudeCenter, coord.longitudeCenter) } )
+    code_local = code[4:]
+    properties.update( { 'code_level_5': code, 'code_local': code_local, 'code_short': olc.shorten(code, y, x) if query is None else olc.shorten(code, coord.latitudeCenter, coord.longitudeCenter) } )
+    # get all information for adding the regional Plus code if necessary
+    if app.config['CODE_REGIONAL_OUT']:
+      properties.update( { 'code_regional': municipality_reverse_handler(center_x, center_y, code_local) } )
 
   # valid GeoJSON
   return {
@@ -163,6 +178,40 @@ def response_handler(data, status):
   if 'ACCESS_CONTROL_ALLOW_ORIGIN' in app.config:
     response.headers['Access-Control-Allow-Origin'] = app.config['ACCESS_CONTROL_ALLOW_ORIGIN']
   return response, status
+
+# municipality reverse search handler
+def municipality_reverse_handler(x, y, code_local):
+
+  # get URL of reverse geocoder returning municipality names (as GeoJSON) on querying pairs of coordinates from settings
+  municipality_reverse_url = app.config['MUNICIPALITY_REVERSE_URL']
+
+  # build the query string
+  query = str(x) + ',' + str(y)
+
+  # query the reverse geocoder, process the response and return the first municipality name found
+  try:
+    response = req.get(municipality_reverse_url + query).json()
+    municipality_reverse_target_property = app.config['MUNICIPALITY_REVERSE_TARGET_PROPERTY']
+    municipality_name = response['features'][0]['properties'][municipality_reverse_target_property]
+    # drop the municipality name part after the comma if necessary
+    municipality_name = municipality_name[:municipality_name.index(',')] if ',' in municipality_name else municipality_name
+    return code_local + ', ' + municipality_name
+  except:
+    return 'not definable'
+
+# municipality forward search handler
+def municipality_forward_handler(municipality_name):
+
+  # get URL of forward geocoder returning municipality centroids (as GeoJSON) on querying municipality names
+  municipality_forward_url = app.config['MUNICIPALITY_FORWARD_URL']
+
+  # query the forward geocoder, process the response and return the centroid pair of coordinates of the first municipality found
+  try:
+    response = req.get(municipality_forward_url + municipality_name).json()
+    coordinates = response['features'][0]['geometry']['coordinates']
+    return coordinates[0], coordinates[1]
+  except:
+    return None, None
 
 
 
@@ -216,19 +265,38 @@ def query():
     return response_handler(data, HTTP_ERROR_STATUS_)
 
   # required query parameter, i.e. what to look for:
-  # encode queried pair of coordinates if they are valid, return an error if not
-  if COORDINATE_SEPARATOR_ in query:
-    query = query.split(COORDINATE_SEPARATOR_)
-    try:
-      data, status = olc_handler(float(query[0]), float(query[1]), None, epsg_in, epsg_out)
-      return response_handler(data, status)
-    except:
-      data = { 'message': DEFAULT_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
-      return response_handler(data, HTTP_ERROR_STATUS_)
+  if SEPARATOR_ in query:
+    # if necessary: decode queried regional Plus code if it is valid, return an error if not
+    if app.config['CODE_REGIONAL_IN'] and olc.SEPARATOR_ in query:
+      query = query.split(SEPARATOR_)
+      if olc.SEPARATOR_ in query[0]:
+        code = query[0]
+        municipality_name = query[1]
+      elif olc.SEPARATOR_ in query[1]:
+        code = query[1]
+        municipality_name = query[0]
+      else:
+        data = { 'message': DEFAULT_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
+        return response_handler(data, HTTP_ERROR_STATUS_)
+      try:
+        data, status = olc_handler(None, None, [code, municipality_name], epsg_in, epsg_out, True)
+        return response_handler(data, status)
+      except:
+        data = { 'message': DEFAULT_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
+        return response_handler(data, HTTP_ERROR_STATUS_)
+    # encode queried pair of coordinates if they are valid, return an error if not
+    else:
+      query = query.split(SEPARATOR_)
+      try:
+        data, status = olc_handler(float(query[0]), float(query[1]), None, epsg_in, epsg_out, False)
+        return response_handler(data, status)
+      except:
+        data = { 'message': DEFAULT_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
+        return response_handler(data, HTTP_ERROR_STATUS_)
   # decode queried Plus code if it is valid, return an error if not
   else:
     try:
-      data, status = olc_handler(None, None, query, epsg_in, epsg_out)
+      data, status = olc_handler(None, None, query, epsg_in, epsg_out, False)
       return response_handler(data, status)
     except:
       data = { 'message': DEFAULT_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }

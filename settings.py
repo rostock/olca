@@ -9,6 +9,12 @@
 DEFAULT_EPSG_IN = 4326
 # default EPSG code for all returned pairs of coordinates
 DEFAULT_EPSG_OUT = 4326
+# enable querying for regional Plus codes containing municipality names (e.g. 33VX+44, Rostock)?
+# also edit the secret settings file if true!
+CODE_REGIONAL_IN = True
+# add an extra property to GeoJSON results with the regional Plus code containing a municipality name (e.g. 33VX+44, Rostock)?
+# also edit the secret settings file if true!
+CODE_REGIONAL_OUT = True
 
 # optional
 
