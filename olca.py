@@ -155,7 +155,7 @@ def olc_handler(x, y, query, epsg_in, epsg_out, code_regional):
     properties.update( { 'code_level_5': code, 'code_local': code_local, 'code_short': olc.shorten(code, y, x) if query is None else olc.shorten(code, coord.latitudeCenter, coord.longitudeCenter) } )
     # get all information for adding the regional Plus code if necessary
     if app.config['CODE_REGIONAL_OUT']:
-      properties.update( { 'code_regional': municipality_reverse_handler(center_x, center_y, code_local) } )
+      properties.update( { 'code_regional': municipality_reverse_handler(coord.longitudeCenter, coord.latitudeCenter, code_local) } )
 
   # valid GeoJSON
   return {
