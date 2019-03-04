@@ -28,11 +28,6 @@ A web API for converting coordinates to [*Plus codes*](https://plus.codes) of th
 
 ## Configuration
 
-1.  Create a new secret settings file by copying the template for it:
-
-        cp /usr/local/olca/olca/secrets.template /usr/local/olca/olca/secrets.py
-        
-1.  Edit the secret settings file 
 1.  Edit the general settings file `/usr/local/olca/olca/settings.py`
 
 ## Deployment

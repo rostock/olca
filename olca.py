@@ -182,34 +182,35 @@ def response_handler(data, status):
 # municipality reverse search handler
 def municipality_reverse_handler(x, y, code_local):
 
-  # get URL of reverse geocoder returning municipality names (as GeoJSON) on querying pairs of coordinates from settings
+  # get Nominatim base URL in reverse geocoder mode (returning a municipality name on querying pairs of coordinates) from settings
   municipality_reverse_url = app.config['MUNICIPALITY_REVERSE_URL']
 
   # build the query string
-  query = str(x) + ',' + str(y)
+  query = '&lon=' + str(x) + '&lat=' + str(y)
 
-  # query the reverse geocoder, process the response and return the first municipality name found
+  # query Nominatim (via proxy if necessary) and return the municipality name
   try:
-    response = req.get(municipality_reverse_url + query).json()
-    municipality_reverse_target_property = app.config['MUNICIPALITY_REVERSE_TARGET_PROPERTY']
-    municipality_name = response['features'][0]['properties'][municipality_reverse_target_property]
-    # drop the municipality name part after the comma if necessary
-    municipality_name = municipality_name[:municipality_name.index(',')] if ',' in municipality_name else municipality_name
-    return code_local + ', ' + municipality_name
+    response = req.get(municipality_reverse_url + query, proxies = app.config['MUNICIPALITY_PROXY']).json() if 'MUNICIPALITY_PROXY' in app.config else req.get(municipality_reverse_url + query).json()
+    return code_local + ', ' + response['name']
   except:
     return 'not definable'
 
 # municipality forward search handler
 def municipality_forward_handler(municipality_name):
 
-  # get URL of forward geocoder returning municipality centroids (as GeoJSON) on querying municipality names
+  # get Nominatim base URL in forward geocoder mode (returning municipality centroids on querying municipality names) from settings
   municipality_forward_url = app.config['MUNICIPALITY_FORWARD_URL']
 
-  # query the forward geocoder, process the response and return the centroid pair of coordinates of the first municipality found
+  # build the query string
+  query = '&city=' + municipality_name
+
+  # query Nominatim (via proxy if necessary), process the response and return the centroid pair of coordinates of the first municipality found
   try:
-    response = req.get(municipality_forward_url + municipality_name).json()
-    coordinates = response['features'][0]['geometry']['coordinates']
-    return coordinates[0], coordinates[1]
+    response = req.get(municipality_forward_url + query, proxies = app.config['MUNICIPALITY_PROXY']).json() if 'MUNICIPALITY_PROXY' in app.config else req.get(municipality_forward_url + query).json()
+    for response_item in response:
+      if response_item['type'] == 'administrative' or response_item['type'] == 'city' or response_item['type'] == 'town':
+        return float(response_item['lon']), float(response_item['lat'])
+    return None, None
   except:
     return None, None
 
@@ -227,7 +228,7 @@ def query():
   handled_request = request_handler(request, 'query')
   if handled_request is not None:
     # careful with the  the plus sign!
-    query = unquote(quote_plus(handled_request))
+    query = unquote(quote_plus(handled_request.encode('utf-8')))
   else:
     data = { 'message': 'missing required \'query\' parameter or parameter empty', 'status': HTTP_ERROR_STATUS_ }
     return response_handler(data, HTTP_ERROR_STATUS_)

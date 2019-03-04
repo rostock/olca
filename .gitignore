@@ -2,8 +2,5 @@
 __pycache__/
 *.py[cod]
 
-# private configuration
-secrets.py
-
 # WSGI scripts
 *.wsgi
