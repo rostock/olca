@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 
-# application
+# application (route /, i.e. the main entry point)
 
 # required
 
@@ -29,6 +29,22 @@ MUNICIPALITY_REVERSE_URL = 'https://nominatim.openstreetmap.org/reverse?format=j
 MUNICIPALITY_PROXY = {
   'https': 'http://172.20.100.50:8080',
 }
+
+
+# application (route /map, i.e. the map-like entry point)
+
+# required
+
+# possible modes the map-like entry point can run in
+MAP_MODES = ['labels']
+# default mode the map-like entry point runs in
+DEFAULT_MAP_MODE = 'labels'
+# default EPSG code for provided bbox (default EPSG code of OLC: 4326)
+DEFAULT_MAP_EPSG_IN = 4326
+# default EPSG code for all returned pairs of coordinates
+DEFAULT_MAP_EPSG_OUT = 4326
+# pretty-print JSONified output?
+DEFAULT_MAP_PRETTY = False
 
 
 # Flask
