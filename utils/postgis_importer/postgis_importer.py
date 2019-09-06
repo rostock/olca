@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
 
 import math
-import openlocationcode as olc
 import os
 import psycopg2
+
+import sys
+sys.path.append('../../')
+
+import openlocationcode as olc
 
 
 
