@@ -17,7 +17,7 @@ EARTH_RADIUS_ = 6371 # kilometers
 # settings: required
 
 # make sure this folder exists and the user running this script has write access to it
-TARGET_FOLDER = 'tmp'
+TARGET_FOLDER = '/tmp'
 FILE_NAME_PREFIX = 'olc_'
 FILE_NAME_SUFFIX = '.csv'
 
