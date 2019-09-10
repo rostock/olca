@@ -35,9 +35,9 @@ MUNICIPALITY_PROXY = {
 
 # required
 
-# possible modes the map-like entry point can run in
-MAP_MODES = ['labels']
-# default mode the map-like entry point runs in
+# possible operation modes the map-like entry point can run in
+MAP_MODES = ['labels'] # currently: 'labels'
+# default operation mode the map-like entry point runs in
 DEFAULT_MAP_MODE = 'labels'
 # default EPSG code for provided bbox (default EPSG code of OLC: 4326)
 DEFAULT_MAP_EPSG_IN = 4326

@@ -2,20 +2,17 @@
 
 from flask import Flask, jsonify, redirect, request
 from flask_compress import Compress
-from urllib import quote_plus, unquote
 import math
 import openlocationcode as olc
 import pyproj as p
-import requests as req
 import re
+import requests as req
+from urllib import quote_plus, unquote
 
 
 
-# global constants
-HTTP_OK_STATUS_ = 200
-HTTP_ERROR_STATUS_ = 400
-DEFAULT_ERROR_MESSAGE_ = 'value of required \'query\' parameter is neither a valid pair of coordinates (required order: longitude/x,latitude/y) nor a valid Plus code'
-DEFAULT_MAP_ERROR_MESSAGE_ = 'value of required \'bbox\' parameter is not a valid quadruple of coordinates (required order: southwest longitude/x,southwest latitude/y,northeast longitude/x,northeast latitude/y)'
+# global constants: core functionality
+
 SEPARATOR_ = ','
 OLC_EPSG_ = 4326
 OLC_PRECISION_ = len(str(0.000125)[2:])
@@ -23,86 +20,130 @@ EARTH_RADIUS_ = 6371 # kilometers
 
 
 
+# global constants: API
+
+HTTP_OK_STATUS_ = 200
+HTTP_ERROR_STATUS_ = 400
+DEFAULT_ERROR_MESSAGE_ = 'value of required \'query\' parameter is neither a valid pair of coordinates (required order: longitude/x,latitude/y) nor a valid Plus code'
+DEFAULT_MAP_ERROR_MESSAGE_ = 'value of required \'bbox\' parameter is not a valid quadruple of coordinates (required order: southwest longitude/x,southwest latitude/y,northeast longitude/x,northeast latitude/y)'
+
+
+
 # initialise application
+
 app = Flask(__name__)
 
 
 
-# import configurations from files
-app.config.from_pyfile('secrets.py', silent = True)
+# import settings from configuration file
+
 app.config.from_pyfile('settings.py', silent = True)
 
 
 
 # initialise Compress
+
 Compress(app)
 
 
 
-# custom functions
+# custom functions: core functionality
 
-# request handler
-def request_handler(request, arg_name):
+# extracts digits from a text
+def digit_extractor(text):
 
-  # cover GET method
-  if request.method == 'GET' and arg_name in request.args:
-    return request.args[arg_name]
+  # return digits if found in text, return (unchanged) text if not
+  if bool(re.search(r'\d', text)):
+    digit_list = re.findall(r'\d+', text)[0]
+    return ''.join(str(digit) for digit in digit_list)
   else:
-    # cover POST method with form body
-    if request.method == 'POST' and arg_name in request.form:
-      return request.form[arg_name]
-    else:
-      # read JSON data (just in case JSON data is provided via POST)
-      request_data = request.get_json()
-      # cover POST method with JSON data
-      if request.method == 'POST' and request_data is not None and arg_name in request_data:
-        return request_data[arg_name]
+    return text
 
 
-# EPSG transformation handler
-def epsg_handler(epsg_in, epsg_out, source_x, source_y):
+# calculates the great circle distance of two geographical points
+def distance_calculator(from_point_x, from_point_y, to_point_x, to_point_y):
+    
+  from_point_x, from_point_y, to_point_x, to_point_y = map(math.radians, [from_point_x, from_point_y, to_point_x, to_point_y])
+  dlon = to_point_x - from_point_x
+  dlat = to_point_y - from_point_y
+  a = math.sin(dlat / 2) ** 2 + math.cos(from_point_y) * math.cos(to_point_y) * math.sin(dlon / 2) ** 2
+
+  # return calculated distance
+  return 2 * EARTH_RADIUS_ * math.asin(math.sqrt(a))
+
+
+# returns a municipality centroid on querying a municipality name
+def municipality_forward_searcher(municipality_name):
+
+  # get Nominatim base URL in forward geocoder mode (returning municipality centroids on querying municipality names) from settings
+  municipality_forward_url = app.config['MUNICIPALITY_FORWARD_URL']
+
+  # build the query string
+  query = '&city=' + municipality_name
+
+  # query Nominatim (via proxy if necessary), process the response and return the centroid pair of coordinates of the first municipality found
+  try:
+    response = req.get(municipality_forward_url + query, proxies = app.config['MUNICIPALITY_PROXY']).json() if 'MUNICIPALITY_PROXY' in app.config else req.get(municipality_forward_url + query).json()
+    for response_item in response:
+      if response_item['type'] == 'administrative' or response_item['type'] == 'city' or response_item['type'] == 'town':
+        return float(response_item['lon']), float(response_item['lat'])
+    return None, None
+  except:
+    return None, None
+
+
+# returns a municipality name on querying a pair of coordinates (i.e. a municipality centroid)
+def municipality_reverse_searcher(x, y, code_local):
+
+  # get Nominatim base URL in reverse geocoder mode (returning a municipality name on querying pairs of coordinates) from settings
+  municipality_reverse_url = app.config['MUNICIPALITY_REVERSE_URL']
+
+  # build the query string
+  query = '&lon=' + str(x) + '&lat=' + str(y)
+
+  # query Nominatim (via proxy if necessary) and return the municipality name
+  try:
+    response = req.get(municipality_reverse_url + query, proxies = app.config['MUNICIPALITY_PROXY']).json() if 'MUNICIPALITY_PROXY' in app.config else req.get(municipality_reverse_url + query).json()
+    return code_local + ', ' + response['name']
+  except:
+    return 'not definable'
+
+
+# reprojects (transforms) a point from one EPSG code to another
+def point_reprojector(epsg_in, epsg_out, source_x, source_y):
 
   source_projection = p.Proj(init = 'epsg:' + str(epsg_in)) if epsg_out is None else p.Proj(init = 'epsg:' + str(OLC_EPSG_))
   target_projection = p.Proj(init = 'epsg:' + str(OLC_EPSG_)) if epsg_out is None else p.Proj(init = 'epsg:' + str(epsg_out))
+
+  # return reprojected (transformed) point
   return p.transform(source_projection, target_projection, source_x, source_y)
-
-
-# distance handler
-def distance_handler(from_point_x, from_point_y, to_point_x, to_point_y):
-    
-    # calculate the great circle distance of two geographical points
-    from_point_x, from_point_y, to_point_x, to_point_y = map(math.radians, [from_point_x, from_point_y, to_point_x, to_point_y])
-    dlon = to_point_x - from_point_x
-    dlat = to_point_y - from_point_y
-    a = math.sin(dlat / 2) ** 2 + math.cos(from_point_y) * math.cos(to_point_y) * math.sin(dlon / 2) ** 2
-    return 2 * EARTH_RADIUS_ * math.asin(math.sqrt(a))
 
 
 # Open Location Code (OLC) handler
 def olc_handler(x, y, query, epsg_in, epsg_out, code_regional):
 
-  # if necessary...
+  # if necessary…
   if code_regional:
     # decode queried regional Plus code if it is valid, return an error if not
-    municipality_centroid_x, municipality_centroid_y = municipality_forward_handler(query[1])
+    municipality_centroid_x, municipality_centroid_y = municipality_forward_searcher(query[1])
     try:
       query = olc.recoverNearest(query[0], municipality_centroid_y, municipality_centroid_x)
     except:
       return { 'message': 'provided regional Plus code is not valid', 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
   
-  # if a pair of coordinates was queried...
+  # if a pair of coordinates was queried…
   if query is None:
     # transform if EPSG code of queried pair of coordinates is not equal to default EPSG code of OLC
     if epsg_in != OLC_EPSG_:
       try:
-        x, y = epsg_handler(epsg_in, None, x, y)
+        x, y = point_reprojector(epsg_in, None, x, y)
       except:
         return { 'message': 'transformation of provided pair of coordinates (required order: longitude/x,latitude/y) not possible', 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
     # encode queried pair of coordinates
     code = olc.encode(y, x)
-  # if not...
+  # if not…
   else:
-    # take query as the Plus code
+    # take query (as is) as the Plus code
     code = query
 
   # take care of short Plus code if necessary
@@ -120,12 +161,12 @@ def olc_handler(x, y, query, epsg_in, epsg_out, code_regional):
   # get the full Plus code
   code = olc.encode(center_y, center_x)
   
-  # transform all pairs of coordinates to be returned if EPSG code for all returned pairs of coordinates is not equal to default EPSG code of OLC, round to six decimals if not
+  # transform all pairs of coordinates to be returned if EPSG code for all returned pairs of coordinates is not equal to default EPSG code of OLC, round to six decimals each if not
   if epsg_out != OLC_EPSG_:
     try:
-      center_x, center_y = epsg_handler(None, epsg_out, center_x, center_y)
-      bbox_sw_x, bbox_sw_y = epsg_handler(None, epsg_out, bbox_sw_x, bbox_sw_y)
-      bbox_ne_x, bbox_ne_y = epsg_handler(None, epsg_out, bbox_ne_x, bbox_ne_y)
+      center_x, center_y = point_reprojector(None, epsg_out, center_x, center_y)
+      bbox_sw_x, bbox_sw_y = point_reprojector(None, epsg_out, bbox_sw_x, bbox_sw_y)
+      bbox_ne_x, bbox_ne_y = point_reprojector(None, epsg_out, bbox_ne_x, bbox_ne_y)
     except Exception as e:
       return { 'message': str(e), 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
   else:
@@ -172,9 +213,9 @@ def olc_handler(x, y, query, epsg_in, epsg_out, code_regional):
     properties.update( { 'code_level_5': code, 'code_local': code_local, 'code_short': olc.shorten(code, y, x) if query is None else olc.shorten(code, coord.latitudeCenter, coord.longitudeCenter) } )
     # get all information for adding the regional Plus code if necessary
     if app.config['CODE_REGIONAL_OUT']:
-      properties.update( { 'code_regional': municipality_reverse_handler(coord.longitudeCenter, coord.latitudeCenter, code_local) } )
+      properties.update( { 'code_regional': municipality_reverse_searcher(coord.longitudeCenter, coord.latitudeCenter, code_local) } )
 
-  # valid GeoJSON
+  # return valid GeoJSON
   return {
     'type': 'Feature',
     'properties': properties,
@@ -197,13 +238,13 @@ def olc_loop_handler(min_x, min_y, max_x, max_y, epsg_in, epsg_out, mode):
   # transform if EPSG code of input min/max x/y is not equal to default EPSG code of OLC
   if epsg_in != OLC_EPSG_:
     try:
-      min_x, min_y = epsg_handler(epsg_in, None, min_x, min_y)
-      max_x, max_y = epsg_handler(epsg_in, None, max_x, max_y)
+      min_x, min_y = point_reprojector(epsg_in, None, min_x, min_y)
+      max_x, max_y = point_reprojector(epsg_in, None, max_x, max_y)
     except:
       return { 'message': 'transformation of provided quadruple of coordinates (required order: southwest longitude/x,southwest latitude/y,northeast longitude/x,northeast latitude/y) not possible', 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
 
-  # calculate the OLC level the loop encoding will take place within
-  distance = distance_handler(min_x, min_y, max_x, max_y)
+  # calculate the OLC level the loop will take place within
+  distance = distance_calculator(min_x, min_y, max_x, max_y)
   if distance <= 0.75:
     level = 5
   elif distance <= 7.5:
@@ -243,10 +284,10 @@ def olc_loop_handler(min_x, min_y, max_x, max_y, epsg_in, epsg_out, mode):
       # decode again to calculate the center pair of coordinates
       coord = olc.decode(code)
       center_x, center_y = coord.longitudeCenter, coord.latitudeCenter
-      # transform all pairs of coordinates to be returned if EPSG code for all returned pairs of coordinates is not equal to default EPSG code of OLC, round to six decimals if not
+      # transform the center pair of coordinates if EPSG code for all returned pairs of coordinates is not equal to default EPSG code of OLC, round to six decimals if not
       if epsg_out != OLC_EPSG_:
         try:
-          center_x, center_y = epsg_handler(None, epsg_out, center_x, center_y)
+          center_x, center_y = point_reprojector(None, epsg_out, center_x, center_y)
         except Exception as e:
           return { 'message': str(e), 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
       else:
@@ -269,7 +310,7 @@ def olc_loop_handler(min_x, min_y, max_x, max_y, epsg_in, epsg_out, mode):
         # grid level
         'level': level
       }
-      # valid GeoJSON
+      # build valid GeoJSON
       if points_only:
         data = {
           'type': 'Feature',
@@ -283,11 +324,52 @@ def olc_loop_handler(min_x, min_y, max_x, max_y, epsg_in, epsg_out, mode):
         data = {}
       data_list.append(data)
 
+  # return valid GeoJSON (the filled data list, to be precise)
   return data_list, HTTP_OK_STATUS_
 
 
+
+# custom functions: API
+
+# multiple GeoJSON features (i.e. within a FeatureCollection) handler
+def multiple_features_handler(geojson):
+
+  return {
+    'type': 'FeatureCollection',
+    'features': geojson
+  }
+
+
+# request handler
+def request_handler(request, arg_name):
+
+  # cover GET method
+  if request.method == 'GET' and arg_name in request.args:
+    return request.args[arg_name]
+  else:
+    # cover POST method with form body
+    if request.method == 'POST' and arg_name in request.form:
+      return request.form[arg_name]
+    else:
+      # read JSON data (just in case JSON data is provided via POST)
+      request_data = request.get_json()
+      # cover POST method with JSON data
+      if request.method == 'POST' and request_data is not None and arg_name in request_data:
+        return request_data[arg_name]
+
+
 # response handler
-def response_handler(data, status):
+def response_handler(data, status, epsg_out):
+
+  # add GeoJSON coordinate reference system if necessary
+  if status == 200 and epsg_out is not None and epsg_out != OLC_EPSG_:
+    data['crs'] = {
+      'type': 'link',
+      'properties': {
+        'type': 'proj4',
+        'href': 'https://spatialreference.org/ref/epsg/' + str(epsg_out) + '/proj4/'
+      }
+    }
 
   # always JSON
   response = jsonify(data)
@@ -299,55 +381,10 @@ def response_handler(data, status):
   return response, status
 
 
-# multiple GeoJSON features (i.e. within a FeatureCollection) handler
-def multiple_features_handler(data):
-
-  return {
-    'type': 'FeatureCollection',
-    'features': data
-  }
-
-
-# municipality reverse search handler
-def municipality_reverse_handler(x, y, code_local):
-
-  # get Nominatim base URL in reverse geocoder mode (returning a municipality name on querying pairs of coordinates) from settings
-  municipality_reverse_url = app.config['MUNICIPALITY_REVERSE_URL']
-
-  # build the query string
-  query = '&lon=' + str(x) + '&lat=' + str(y)
-
-  # query Nominatim (via proxy if necessary) and return the municipality name
-  try:
-    response = req.get(municipality_reverse_url + query, proxies = app.config['MUNICIPALITY_PROXY']).json() if 'MUNICIPALITY_PROXY' in app.config else req.get(municipality_reverse_url + query).json()
-    return code_local + ', ' + response['name']
-  except:
-    return 'not definable'
-
-
-# municipality forward search handler
-def municipality_forward_handler(municipality_name):
-
-  # get Nominatim base URL in forward geocoder mode (returning municipality centroids on querying municipality names) from settings
-  municipality_forward_url = app.config['MUNICIPALITY_FORWARD_URL']
-
-  # build the query string
-  query = '&city=' + municipality_name
-
-  # query Nominatim (via proxy if necessary), process the response and return the centroid pair of coordinates of the first municipality found
-  try:
-    response = req.get(municipality_forward_url + query, proxies = app.config['MUNICIPALITY_PROXY']).json() if 'MUNICIPALITY_PROXY' in app.config else req.get(municipality_forward_url + query).json()
-    for response_item in response:
-      if response_item['type'] == 'administrative' or response_item['type'] == 'city' or response_item['type'] == 'town':
-        return float(response_item['lon']), float(response_item['lat'])
-    return None, None
-  except:
-    return None, None
-
-
 
 
 # routing
+
 @app.route('/', methods=['GET', 'POST'])
 def query():
 
@@ -361,17 +398,14 @@ def query():
     query = unquote(quote_plus(handled_request.encode('utf-8')))
   else:
     data = { 'message': 'missing required \'query\' parameter or parameter empty', 'status': HTTP_ERROR_STATUS_ }
-    return response_handler(data, HTTP_ERROR_STATUS_)
+    return response_handler(data, HTTP_ERROR_STATUS_, None)
 
   # optional EPSG code parameter for queried pair of coordinates:
   # set to corresponding value if provided via request arguments, set to corresponding default value in settings if not
   handled_request = request_handler(request, 'epsg_in')
   if handled_request is not None:
-    # a little trick here: only look for digits in the parameter
-    if bool(re.search(r'\d', handled_request)):
-      epsg_in = re.findall('\d+', handled_request)[0]
-    else:
-      epsg_in = handled_request
+    # a little trick here: extract digits only
+    epsg_in = digit_extractor(handled_request)
   else:
     epsg_in = app.config['DEFAULT_EPSG_IN']
 
@@ -379,11 +413,8 @@ def query():
   # set to corresponding value if provided via request arguments, set to corresponding default value in settings if not
   handled_request = request_handler(request, 'epsg_out')
   if handled_request is not None:
-    # a little trick here: only look for digits in the parameter
-    if bool(re.search(r'\d', handled_request)):
-      epsg_out = re.findall('\d+', handled_request)[0]
-    else:
-      epsg_out = handled_request
+    # a little trick here: extract digits only
+    epsg_out = digit_extractor(handled_request)
   else:
     epsg_out = app.config['DEFAULT_EPSG_OUT']
 
@@ -394,14 +425,14 @@ def query():
     epsg_in = int(epsg_in)
   except ValueError:
     data = { 'message': 'value of optional \'epsg_in\' parameter is not a number', 'status': HTTP_ERROR_STATUS_ }
-    return response_handler(data, HTTP_ERROR_STATUS_)
+    return response_handler(data, HTTP_ERROR_STATUS_, None)
 
   # return an error if optional EPSG code parameter for all returned pairs of coordinates is not a number
   try:
     epsg_out = int(epsg_out)
   except ValueError:
     data = { 'message': 'value of optional \'epsg_out\' parameter is not a number', 'status': HTTP_ERROR_STATUS_ }
-    return response_handler(data, HTTP_ERROR_STATUS_)
+    return response_handler(data, HTTP_ERROR_STATUS_, None)
 
   # required query parameter, i.e. what to look for:
   if SEPARATOR_ in query:
@@ -416,30 +447,30 @@ def query():
         municipality_name = query[0]
       else:
         data = { 'message': DEFAULT_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
-        return response_handler(data, HTTP_ERROR_STATUS_)
+        return response_handler(data, HTTP_ERROR_STATUS_, None)
       try:
         data, status = olc_handler(None, None, [code, municipality_name], epsg_in, epsg_out, True)
-        return response_handler(data, status)
+        return response_handler(data, status, epsg_out)
       except:
         data = { 'message': DEFAULT_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
-        return response_handler(data, HTTP_ERROR_STATUS_)
+        return response_handler(data, HTTP_ERROR_STATUS_, None)
     # encode queried pair of coordinates if they are valid, return an error if not
     else:
       query = query.split(SEPARATOR_)
       try:
         data, status = olc_handler(float(query[0]), float(query[1]), None, epsg_in, epsg_out, False)
-        return response_handler(data, status)
+        return response_handler(data, status, epsg_out)
       except:
         data = { 'message': DEFAULT_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
-        return response_handler(data, HTTP_ERROR_STATUS_)
+        return response_handler(data, HTTP_ERROR_STATUS_, None)
   # decode queried Plus code if it is valid, return an error if not
   else:
     try:
       data, status = olc_handler(None, None, query, epsg_in, epsg_out, False)
-      return response_handler(data, status)
+      return response_handler(data, status, epsg_out)
     except:
       data = { 'message': DEFAULT_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
-      return response_handler(data, HTTP_ERROR_STATUS_)
+      return response_handler(data, HTTP_ERROR_STATUS_, None)
 
 
 @app.route('/map', methods=['GET', 'POST'])
@@ -454,9 +485,9 @@ def map_query():
     bbox = handled_request
   else:
     data = { 'message': 'missing required \'bbox\' parameter or parameter empty', 'status': HTTP_ERROR_STATUS_ }
-    return response_handler(data, HTTP_ERROR_STATUS_)
+    return response_handler(data, HTTP_ERROR_STATUS_, None)
 
-  # optional mode parameter, i.e. which mode to run in:
+  # optional mode parameter, i.e. which operation mode to run in:
   # set to corresponding value if provided via request arguments, set to corresponding default value in settings if not
   handled_request = request_handler(request, 'mode')
   if handled_request is not None and handled_request in app.config['MAP_MODES']:
@@ -468,11 +499,8 @@ def map_query():
   # set to corresponding value if provided via request arguments, set to corresponding default value in settings if not
   handled_request = request_handler(request, 'epsg_in')
   if handled_request is not None:
-    # a little trick here: only look for digits in the parameter
-    if bool(re.search(r'\d', handled_request)):
-      epsg_in = re.findall('\d+', handled_request)[0]
-    else:
-      epsg_in = handled_request
+    # a little trick here: extract digits only
+    epsg_in = digit_extractor(handled_request)
   else:
     epsg_in = app.config['DEFAULT_MAP_EPSG_IN']
 
@@ -480,11 +508,8 @@ def map_query():
   # set to corresponding value if provided via request arguments, set to corresponding default value in settings if not
   handled_request = request_handler(request, 'epsg_out')
   if handled_request is not None:
-    # a little trick here: only look for digits in the parameter
-    if bool(re.search(r'\d', handled_request)):
-      epsg_out = re.findall('\d+', handled_request)[0]
-    else:
-      epsg_out = handled_request
+    # a little trick here: extract digits only
+    epsg_out = digit_extractor(handled_request)
   else:
     epsg_out = app.config['DEFAULT_MAP_EPSG_OUT']
 
@@ -508,14 +533,14 @@ def map_query():
     epsg_in = int(epsg_in)
   except ValueError:
     data = { 'message': 'value of optional \'epsg_in\' parameter is not a number', 'status': HTTP_ERROR_STATUS_ }
-    return response_handler(data, HTTP_ERROR_STATUS_)
+    return response_handler(data, HTTP_ERROR_STATUS_, None)
 
   # return an error if optional EPSG code parameter for all returned pairs of coordinates is not a number
   try:
     epsg_out = int(epsg_out)
   except ValueError:
     data = { 'message': 'value of optional \'epsg_out\' parameter is not a number', 'status': HTTP_ERROR_STATUS_ }
-    return response_handler(data, HTTP_ERROR_STATUS_)
+    return response_handler(data, HTTP_ERROR_STATUS_, None)
 
   # required bbox parameter, i.e. the bbox the request is relevant for:
   bbox = bbox.split(SEPARATOR_)
@@ -524,27 +549,31 @@ def map_query():
     try:
       bbox_sw_x, bbox_sw_y = float(bbox[0]), float(bbox[1])
       bbox_ne_x, bbox_ne_y = float(bbox[2]), float(bbox[3])
-      # if bbox is really a bbox: loop through bbox and encode all pairs of coordinates if possible, return an error if not
+      # if bbox is a true bbox: loop through it and encode all pairs of coordinates if possible, return an error if not
       if bbox_ne_x >= bbox_sw_x and bbox_ne_y >= bbox_sw_y:
         data_list, status = olc_loop_handler(bbox_sw_x, bbox_sw_y, bbox_ne_x, bbox_ne_y, epsg_in, epsg_out, mode)
         if pretty:
           app.config['JSONIFY_PRETTYPRINT_REGULAR'] = True
         else:
           app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
-        return response_handler(multiple_features_handler(data_list), status)
+        if len(data_list) < 2:
+          return response_handler(data_list[0], status, epsg_out)
+        else:
+          return response_handler(multiple_features_handler(data_list), status, epsg_out)
       else:
         data = { 'message': DEFAULT_MAP_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
-        return response_handler(data, HTTP_ERROR_STATUS_)
+        return response_handler(data, HTTP_ERROR_STATUS_, None)
     except:
       data = { 'message': DEFAULT_MAP_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
-      return response_handler(data, HTTP_ERROR_STATUS_)
+      return response_handler(data, HTTP_ERROR_STATUS_, None)
   else:
     data = { 'message': DEFAULT_MAP_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
-    return response_handler(data, HTTP_ERROR_STATUS_)
+    return response_handler(data, HTTP_ERROR_STATUS_, None)
 
 
 
 # custom error handling
+
 if 'REDIRECT_URL_403' in app.config:
   @app.errorhandler(403)
   def error_403(error):

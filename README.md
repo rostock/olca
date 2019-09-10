@@ -4,9 +4,9 @@ A web API for converting coordinates to [*Plus codes*](https://plus.codes) of th
 
 ## Requirements
 
-*   [*Python*](https://www.python.org)
-*   [*Virtualenv*](https://virtualenv.pypa.io)
-*   [*pip*](http://pip.pypa.io)
+* [*Python*](https://www.python.org)
+* [*Virtualenv*](https://virtualenv.pypa.io)
+* [*pip*](http://pip.pypa.io)
 
 ## Installation
 
@@ -60,7 +60,14 @@ If you want to deploy OLCA with [*Apache HTTP Server*](https://httpd.apache.org)
 
 ## Usage
 
-Provided that *OLCA* is running under `/olca`, the base URL of the API is `/olca/?`.
+### Entry points
+
+Provided that *OLCA* is running under `/olca`, …
+
+* … the base URL of the main entry point of the API is `/olca/?` and …
+* … the base URL of the map-like entry point of the API is `/olca/map?`.
+
+The main entry point converts coordinates to *Plus codes* and vice versa. The map-like entry point loops through a provided bbox and returns data according to the operation mode requested – an example: if `labels` mode is requested, the API will first calculate the OLC level (depending on the size of the provided bbox), then loop through the provided bbox and finally return both the centroid and the code (as a map label) for each *Plus code* of the calculated level within the provided bbox.
 
 ### Request methods
 
@@ -68,7 +75,7 @@ Provided that *OLCA* is running under `/olca`, the base URL of the API is `/olca
 
 All HTTP request methods share the same parameter names. The parameter names and values are case-sensitive.
 
-Example HTTP `GET` request:
+Example HTTP `GET` request to the main API entry point:
 
         curl 'http://127.0.0.1/olca/?query=9F6J33VX+55&epsg_out=25833'
 
@@ -88,7 +95,7 @@ The same example as an HTTP `POST` request with JSON body:
 
 A valid JSON document with `status` and `message` is returned in case of any error. The `status` is identical to the returned HTTP status.
 
-Example HTTP `GET` request with missing parameter:
+Example HTTP `GET` request with missing parameter to the main API entry point:
 
         curl 'http://127.0.0.1/olca/?epsg_out=25833'
 
@@ -101,9 +108,9 @@ And the corresponding JSON response:
 
 #### Success
 
-Successful requests result in a valid [GeoJSON](http://geojson.org) document with exactly one `Feature` containing properties and a geometry of type `Polygon`.
+Successful requests result in a valid [GeoJSON](http://geojson.org) document.
 
-Example successful HTTP `POST` request with JSON body:
+Example successful HTTP `POST` request with JSON body to the main API entry point:
 
         curl -X POST -H 'Content-Type: application/json' --data '{ "query": "310224,5997753", "epsg_in": 25833, "epsg_out": 2398}' http://127.0.0.1/olca/
 
@@ -157,13 +164,27 @@ And the corresponding GeoJSON response:
 
 ### Parameters
 
-The following parameters are valid for all requests:
+### Main API entry point
+
+The following parameters are valid for all requests to the main API entry point:
 
 | Name | Example(s) | Description | Required | Default |
 | --- | --- | --- | --- | --- |
 | `query` | `9F6J33VX+55` or `9F6J33+` or `9F000000+` or `33VX+55, Rostock` or `rostock,33VX+55` or `12.098,54.092` or `310223,5997644` | the query string: either a valid *Plus code* (**two variants possible:** the pure code or a regional code containing a municipality name, separated from the code with a comma) or a valid pair of coordinates (**required order:** longitude/x,latitude/y) or | yes | / |
-| `epsg_in` | `4326` or `25833` | the [EPSG code](http://www.epsg.org) for all returned pairs of coordinates | no | as configured in `settings.py` |
-| `epsg_out` | `25833` or `2398` | the EPSG code for all returned pairs of coordinates | no | as configured in `settings.py` |
+| `epsg_in` | `4326` or `25833` | [EPSG code](http://www.epsg.org) for queried pair of coordinates | no | as configured in `settings.py` (see `DEFAULT_EPSG_IN`) |
+| `epsg_out` | `25833` or `2398` | EPSG code for all returned pairs of coordinates | no | as configured in `settings.py` (see `DEFAULT_EPSG_OUT`) |
+
+### Map-like API entry point
+
+The following parameters are valid for all requests to the map-like API entry point:
+
+| Name | Example(s) | Description | Required | Default |
+| --- | --- | --- | --- | --- |
+| `bbox` | `12.056,54.11,12.103,54.2245` or `310202,5997644.8565,310224,5997753` | the bbox the request is relevant for as a valid quadruple of coordinates (**required order:** southwest longitude/x,southwest latitude/y,northeast longitude/x,northeast latitude/y) or | yes | / |
+| `mode` | `labels` | operation mode the map-like entry point will run in (`labels` mode: return centroid and code as map label for each *Plus code* within provided bbox) | no | as configured in `settings.py` (see both `MAP_MODES` and `DEFAULT_MAP_MODE`) |
+| `epsg_in` | `4326` or `25833` | EPSG code for provided bbox | no | as configured in `settings.py` (see `DEFAULT_MAP_EPSG_IN`) |
+| `epsg_out` | `25833` or `2398` | EPSG code for all returned pairs of coordinates | no | as configured in `settings.py` (see `DEFAULT_MAP_EPSG_OUT`) |
+| `pretty` | `t` or `0` or `false` | pretty-print JSONified output or not? | no | as configured in `settings.py` (see `DEFAULT_MAP_PRETTY`) |
 
 ### Cross-Origin Resource Sharing
 
