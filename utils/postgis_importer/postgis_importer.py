@@ -60,13 +60,13 @@ if LEVEL is not None and LEVEL in (1, 2, 3, 4, 5):
   level = LEVEL
 else:
   distance = distance_calculator(MIN_X, MIN_Y, MAX_X, MAX_Y)
-  if distance <= 0.75:
+  if distance <= 1:
     level = 5
-  elif distance <= 7.5:
+  elif distance <= 10:
     level = 4
-  elif distance <= 150:
+  elif distance <= 100:
     level = 3
-  elif distance <= 1500:
+  elif distance <= 1000:
     level = 2
   else:
     level = 1

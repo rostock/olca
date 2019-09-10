@@ -245,13 +245,13 @@ def olc_loop_handler(min_x, min_y, max_x, max_y, epsg_in, epsg_out, mode):
 
   # calculate the OLC level the loop will take place within
   distance = distance_calculator(min_x, min_y, max_x, max_y)
-  if distance <= 0.75:
+  if distance <= 1:
     level = 5
-  elif distance <= 7.5:
+  elif distance <= 10:
     level = 4
-  elif distance <= 150:
+  elif distance <= 100:
     level = 3
-  elif distance <= 1500:
+  elif distance <= 1000:
     level = 2
   else:
     level = 1
