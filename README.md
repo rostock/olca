@@ -164,7 +164,7 @@ And the corresponding GeoJSON response:
 
 ### Parameters
 
-### Main API entry point
+#### Main API entry point
 
 The following parameters are valid for all requests to the main API entry point:
 
@@ -174,7 +174,7 @@ The following parameters are valid for all requests to the main API entry point:
 | `epsg_in` | `4326` or `25833` | [EPSG code](http://www.epsg.org) for queried pair of coordinates | no | as configured in `settings.py` (see `DEFAULT_EPSG_IN`) |
 | `epsg_out` | `25833` or `2398` | EPSG code for all returned pairs of coordinates | no | as configured in `settings.py` (see `DEFAULT_EPSG_OUT`) |
 
-### Map-like API entry point
+#### Map-like API entry point
 
 The following parameters are valid for all requests to the map-like API entry point:
 
