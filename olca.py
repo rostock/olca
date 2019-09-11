@@ -245,7 +245,7 @@ def olc_loop_handler(min_x, min_y, max_x, max_y, epsg_in, epsg_out, mode):
 
   # calculate the OLC level the loop will take place within
   distance = distance_calculator(min_x, min_y, max_x, max_y)
-  if distance <= 1:
+  if distance <= 0.8:
     level = 5
   elif distance <= 10:
     level = 4
@@ -294,7 +294,7 @@ def olc_loop_handler(min_x, min_y, max_x, max_y, epsg_in, epsg_out, mode):
         center_x, center_y = round(center_x, OLC_PRECISION_), round(center_y, OLC_PRECISION_)
       # build the label
       if code_length == 10:
-          label = code[9:11]
+          label = code[:4] + '\n' + code[4:9] + '\n' + code[9:]
       elif code_length == 8:
           label = code[:4] + '\n' + code[4:]
       elif code_length == 6:
