@@ -4,15 +4,15 @@ A web API for converting coordinates to [*Plus codes*](https://plus.codes) of th
 
 ## Requirements
 
-* [*Python*](https://www.python.org)
-* [*Virtualenv*](https://virtualenv.pypa.io)
-* [*pip*](http://pip.pypa.io)
+* [*Python*](https://www.python.org) (v3.7)
+* [*Virtualenv*](https://virtualenv.pypa.io) (for *Python* 3)
+* [*pip*](http://pip.pypa.io) (for *Python* 3)
 
 ## Installation
 
 1.  Create a new virtual *Python* environment, for example:
 
-        virtualenv /usr/local/olca/virtualenv
+        virtualenv -p python3 /usr/local/olca/virtualenv
         
 1.  Clone the project:
 
@@ -49,7 +49,7 @@ If you want to deploy OLCA with [*Apache HTTP Server*](https://httpd.apache.org)
 
 1.  Open your *Apache HTTP Server* configuration file and insert something like this:
     
-        WSGIDaemonProcess    olca processes=4 threads=128 python-path=/usr/local/olca/olca:/usr/local/olca/virtualenv/lib/python2.7/site-packages
+        WSGIDaemonProcess    olca processes=4 threads=128 python-path=/usr/local/olca/olca:/usr/local/olca/virtualenv/lib/python3.7/site-packages
         WSGIProcessGroup     olca
         WSGIScriptAlias      /olca /usr/local/olca/olca/olca.wsgi process-group=olca
         
