@@ -60,7 +60,7 @@ if LEVEL is not None and LEVEL in (1, 2, 3, 4, 5):
   level = LEVEL
 else:
   distance = distance_calculator(MIN_X, MIN_Y, MAX_X, MAX_Y)
-  if distance <= 1:
+  if distance <= 0.8:
     level = 5
   elif distance <= 10:
     level = 4
