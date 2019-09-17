@@ -7,7 +7,7 @@ import openlocationcode as olc
 import pyproj as p
 import re
 import requests as req
-from urllib import quote, quote_plus, unquote
+from urllib import quote_plus, unquote
 
 
 
