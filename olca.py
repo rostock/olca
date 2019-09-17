@@ -401,9 +401,10 @@ def query():
     query = unquote(quote_plus(query.encode('utf-8')))
     # replace all multiple occurences of query separators in a row with only one query separator each
     query = re.sub(r'\,+', ',', query)
-    # restore the plus sign
+    # restore the plus sign (wherever it was)
     query = re.sub(r'\,([23456789CFGHJMPQRVWX]{2})$', r'+\1', query)
     query = re.sub(r'\,([23456789CFGHJMPQRVWX]{2})\,', r'+\1,', query)
+    query = re.sub(r'\,$', r'+', query)
   else:
     data = { 'message': 'missing required \'query\' parameter or parameter empty', 'status': HTTP_ERROR_STATUS_ }
     return response_handler(data, HTTP_ERROR_STATUS_, None)
