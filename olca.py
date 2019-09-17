@@ -7,13 +7,14 @@ import openlocationcode as olc
 import pyproj as p
 import re
 import requests as req
-from urllib import quote_plus, unquote
+from urllib import quote, quote_plus, unquote
 
 
 
 # global constants: core functionality
 
-SEPARATOR_ = ','
+QUERY_SEPARATOR_ = ','
+QUERY_ADDITIONAL_SEPARATOR_ = ' '
 OLC_EPSG_ = 4326
 OLC_PRECISION_ = len(str(0.000125)[2:])
 EARTH_RADIUS_ = 6371 # kilometers
@@ -394,8 +395,15 @@ def query():
   # set to corresponding value if provided via request arguments, return an error if not
   handled_request = request_handler(request, 'query')
   if handled_request is not None:
+    # replace all additional query separators with (regular) query separators
+    query = handled_request.replace(QUERY_ADDITIONAL_SEPARATOR_, QUERY_SEPARATOR_)
     # careful with the plus sign!
-    query = unquote(quote_plus(handled_request.encode('utf-8')))
+    query = unquote(quote_plus(query.encode('utf-8')))
+    # replace all multiple occurences of query separators in a row with only one query separator each
+    query = re.sub(r'\,+', ',', query)
+    # restore the plus sign
+    query = re.sub(r'\,([23456789CFGHJMPQRVWX]{2})$', r'+\1', query)
+    query = re.sub(r'\,([23456789CFGHJMPQRVWX]{2})\,', r'+\1,', query)
   else:
     data = { 'message': 'missing required \'query\' parameter or parameter empty', 'status': HTTP_ERROR_STATUS_ }
     return response_handler(data, HTTP_ERROR_STATUS_, None)
@@ -435,10 +443,10 @@ def query():
     return response_handler(data, HTTP_ERROR_STATUS_, None)
 
   # required query parameter, i.e. what to look for:
-  if SEPARATOR_ in query:
+  if QUERY_SEPARATOR_ in query:
     # if necessary: decode queried regional Plus code if it is valid, return an error if not
     if app.config['CODE_REGIONAL_IN'] and olc.SEPARATOR_ in query:
-      query = query.split(SEPARATOR_)
+      query = query.split(QUERY_SEPARATOR_)
       if olc.SEPARATOR_ in query[0]:
         code = query[0]
         municipality_name = query[1]
@@ -456,7 +464,7 @@ def query():
         return response_handler(data, HTTP_ERROR_STATUS_, None)
     # encode queried pair of coordinates if they are valid, return an error if not
     else:
-      query = query.split(SEPARATOR_)
+      query = query.split(QUERY_SEPARATOR_)
       try:
         data, status = olc_handler(float(query[0]), float(query[1]), None, epsg_in, epsg_out, False)
         return response_handler(data, status, epsg_out)
@@ -543,7 +551,7 @@ def map_query():
     return response_handler(data, HTTP_ERROR_STATUS_, None)
 
   # required bbox parameter, i.e. the bbox the request is relevant for:
-  bbox = bbox.split(SEPARATOR_)
+  bbox = bbox.split(QUERY_SEPARATOR_)
   # if bbox is valid: determine southwest longitude/x,southwest latitude/y,northeast longitude/x,northeast latitude/y if possible, return an error if not
   if len(bbox) == 4 and bbox[0] is not None and bbox[1] is not None and bbox[2] is not None and bbox[3] is not None:
     try:

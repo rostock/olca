@@ -170,7 +170,7 @@ The following parameters are valid for all requests to the main API entry point:
 
 | Name | Example(s) | Description | Required | Default |
 | --- | --- | --- | --- | --- |
-| `query` | `9F6J33VX+55` or `9F6J33+` or `9F000000+` or `33VX+55, Rostock` or `rostock,33VX+55` or `12.098,54.092` or `310223,5997644` | the query string: either a valid *Plus code* (**two variants possible:** the pure code or a regional code containing a municipality name, separated from the code with a comma) or a valid pair of coordinates (**required order:** longitude/x,latitude/y) or | yes | / |
+| `query` | `9F6J33VX+55` or `9F6J33+` or `9F000000+` or `33VX+55, Rostock` or `rostock 33VX+55` or `12.098,54.092` or `310223,5997644` | the query string: either a valid *Plus code* (**two variants possible:** the pure code or a regional code containing a municipality name, separated from the code with either a comma and/or a space) or a valid pair of coordinates (**required order:** longitude/x,latitude/y) or | yes | / |
 | `epsg_in` | `4326` or `25833` | [EPSG code](http://www.epsg.org) for queried pair of coordinates | no | as configured in `settings.py` (see `DEFAULT_EPSG_IN`) |
 | `epsg_out` | `25833` or `2398` | EPSG code for all returned pairs of coordinates | no | as configured in `settings.py` (see `DEFAULT_EPSG_OUT`) |
 
