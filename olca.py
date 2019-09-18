@@ -246,16 +246,19 @@ def olc_loop_handler(min_x, min_y, max_x, max_y, epsg_in, epsg_out, mode):
 
   # calculate the OLC level the loop will take place within
   distance = distance_calculator(min_x, min_y, max_x, max_y)
-  if distance <= 0.8:
+  if distance <= 0.5:
     level = 5
-  elif distance <= 10:
+  elif distance <= 5:
     level = 4
   elif distance <= 100:
     level = 3
-  elif distance <= 1000:
+  elif distance <= 500:
     level = 2
   else:
     level = 1
+  # manipulate min/max x/y a bit to create a 10 % buffer around the initially provided bbox
+  bbox_width_buffer, bbox_height_buffer = (max_x - min_x) / 10, (max_y - min_y) / 10
+  min_x, max_x, min_y, max_y = min_x - bbox_width_buffer, max_x + bbox_width_buffer, min_y - bbox_height_buffer, max_y + bbox_height_buffer
   # calculate the OLC level resolution value
   level_resolution = olc.PAIR_RESOLUTIONS_[level - 1]
   # calculate the OLC code length
