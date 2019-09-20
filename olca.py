@@ -26,6 +26,7 @@ EARTH_RADIUS_ = 6371 # kilometers
 HTTP_OK_STATUS_ = 200
 HTTP_ERROR_STATUS_ = 400
 DEFAULT_ERROR_MESSAGE_ = 'value of required \'query\' parameter is neither a valid pair of coordinates (required order: longitude/x,latitude/y) nor a valid Plus code'
+DEFAULT_ERROR_REGIONAL_MESSAGE_ = 'provided regional Plus code is not valid'
 DEFAULT_MAP_ERROR_MESSAGE_ = 'value of required \'bbox\' parameter is not a valid quadruple of coordinates (required order: southwest longitude/x,southwest latitude/y,northeast longitude/x,northeast latitude/y)'
 
 
@@ -129,8 +130,13 @@ def olc_handler(x, y, query, epsg_in, epsg_out, code_regional):
     municipality_centroid_x, municipality_centroid_y = municipality_forward_searcher(query[1])
     try:
       query = olc.recoverNearest(query[0], municipality_centroid_y, municipality_centroid_x)
+      recovered_coord = olc.decode(query)
+      recovered_center_x, recovered_center_y = recovered_coord.longitudeCenter, recovered_coord.latitudeCenter
+      # return an error if municipality centroid is further away than 0.25 degrees from the centroid of the recovered nearest matching code
+      if abs(abs(municipality_centroid_x) - abs(recovered_center_x)) > 0.25 or abs(abs(municipality_centroid_y) - abs(recovered_center_y)) > 0.25:
+        return { 'message': DEFAULT_ERROR_REGIONAL_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
     except:
-      return { 'message': 'provided regional Plus code is not valid', 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
+      return { 'message': DEFAULT_ERROR_REGIONAL_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
   
   # if a pair of coordinates was queried…
   if query is None:
@@ -451,20 +457,20 @@ def query():
     # if necessary: decode queried regional Plus code if it is valid, return an error if not
     if app.config['CODE_REGIONAL_IN'] and olc.SEPARATOR_ in query:
       query = query.split(QUERY_SEPARATOR_)
-      if olc.SEPARATOR_ in query[0]:
+      if olc.SEPARATOR_ in query[0] and len(query[0]) in (7, 8):
         code = query[0]
         municipality_name = query[1]
-      elif olc.SEPARATOR_ in query[1]:
+      elif olc.SEPARATOR_ in query[1] and len(query[1]) in (7, 8):
         code = query[1]
         municipality_name = query[0]
       else:
-        data = { 'message': DEFAULT_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
+        data = { 'message': DEFAULT_ERROR_REGIONAL_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
         return response_handler(data, HTTP_ERROR_STATUS_, None)
       try:
         data, status = olc_handler(None, None, [code, municipality_name], epsg_in, epsg_out, True)
         return response_handler(data, status, epsg_out)
       except:
-        data = { 'message': DEFAULT_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
+        data = { 'message': DEFAULT_ERROR_REGIONAL_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
         return response_handler(data, HTTP_ERROR_STATUS_, None)
     # encode queried pair of coordinates if they are valid, return an error if not
     else:
