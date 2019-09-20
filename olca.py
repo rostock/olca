@@ -25,6 +25,8 @@ EARTH_RADIUS_ = 6371 # kilometers
 
 HTTP_OK_STATUS_ = 200
 HTTP_ERROR_STATUS_ = 400
+DEFAULT_EPSG_IN_ERROR_MESSAGE_ = 'value of optional \'epsg_in\' parameter is not a number'
+DEFAULT_EPSG_OUT_ERROR_MESSAGE_ = 'value of optional \'epsg_out\' parameter is not a number'
 DEFAULT_ERROR_MESSAGE_ = 'value of required \'query\' parameter is neither a valid pair of coordinates (required order: longitude/x,latitude/y) nor a valid Plus code'
 DEFAULT_ERROR_REGIONAL_MESSAGE_ = 'provided regional Plus code is not valid'
 DEFAULT_MAP_ERROR_MESSAGE_ = 'value of required \'bbox\' parameter is not a valid quadruple of coordinates (required order: southwest longitude/x,southwest latitude/y,northeast longitude/x,northeast latitude/y)'
@@ -408,6 +410,8 @@ def query():
     query = handled_request.replace(QUERY_ADDITIONAL_SEPARATOR_, QUERY_SEPARATOR_)
     # careful with the plus sign!
     query = unquote(quote_plus(query.encode('utf-8')))
+    # convert to upper case
+    query = str.upper(query)
     # replace all multiple occurences of query separators in a row with only one query separator each
     query = re.sub(r'\,+', ',', query)
     # restore the plus sign (wherever it was)
@@ -442,14 +446,14 @@ def query():
   try:
     epsg_in = int(epsg_in)
   except ValueError:
-    data = { 'message': 'value of optional \'epsg_in\' parameter is not a number', 'status': HTTP_ERROR_STATUS_ }
+    data = { 'message': DEFAULT_EPSG_IN_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
     return response_handler(data, HTTP_ERROR_STATUS_, None)
 
   # return an error if optional EPSG code parameter for all returned pairs of coordinates is not a number
   try:
     epsg_out = int(epsg_out)
   except ValueError:
-    data = { 'message': 'value of optional \'epsg_out\' parameter is not a number', 'status': HTTP_ERROR_STATUS_ }
+    data = { 'message': DEFAULT_EPSG_OUT_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
     return response_handler(data, HTTP_ERROR_STATUS_, None)
 
   # required query parameter, i.e. what to look for:
@@ -457,12 +461,18 @@ def query():
     # if necessary: decode queried regional Plus code if it is valid, return an error if not
     if app.config['CODE_REGIONAL_IN'] and olc.SEPARATOR_ in query:
       query = query.split(QUERY_SEPARATOR_)
+      #data = { 'message': '|'.join(query), 'status': HTTP_ERROR_STATUS_ }
+      #return response_handler(data, HTTP_ERROR_STATUS_, None)
+      # code is first part of query, municipality name is the remaining parts
+      # don't let regional Plus codes shorter than 7 or longer than 8 chars pass through!
       if olc.SEPARATOR_ in query[0] and len(query[0]) in (7, 8):
         code = query[0]
-        municipality_name = query[1]
-      elif olc.SEPARATOR_ in query[1] and len(query[1]) in (7, 8):
-        code = query[1]
-        municipality_name = query[0]
+        municipality_name = ' '.join(query[1:])
+      # code is last part of query, municipality name is the remaining parts
+      # don't let regional Plus codes shorter than 7 or longer than 8 chars pass through!
+      elif olc.SEPARATOR_ in query[len(query) - 1] and len(query[len(query) - 1]) in (7, 8):
+        code = query[len(query) - 1]
+        municipality_name = ' '.join(query[:len(query) - 1])
       else:
         data = { 'message': DEFAULT_ERROR_REGIONAL_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
         return response_handler(data, HTTP_ERROR_STATUS_, None)
@@ -550,14 +560,14 @@ def map_query():
   try:
     epsg_in = int(epsg_in)
   except ValueError:
-    data = { 'message': 'value of optional \'epsg_in\' parameter is not a number', 'status': HTTP_ERROR_STATUS_ }
+    data = { 'message': DEFAULT_EPSG_IN_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
     return response_handler(data, HTTP_ERROR_STATUS_, None)
 
   # return an error if optional EPSG code parameter for all returned pairs of coordinates is not a number
   try:
     epsg_out = int(epsg_out)
   except ValueError:
-    data = { 'message': 'value of optional \'epsg_out\' parameter is not a number', 'status': HTTP_ERROR_STATUS_ }
+    data = { 'message': DEFAULT_EPSG_OUT_ERROR_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }
     return response_handler(data, HTTP_ERROR_STATUS_, None)
 
   # required bbox parameter, i.e. the bbox the request is relevant for:
