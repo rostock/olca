@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 from flask import Flask, jsonify, redirect, request
 from flask_compress import Compress
 import math

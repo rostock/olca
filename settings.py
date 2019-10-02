@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 # application (route /, i.e. the main entry point)
 
 # required
