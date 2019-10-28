@@ -26,7 +26,7 @@ HTTP_ERROR_STATUS_ = 400
 DEFAULT_EPSG_IN_ERROR_MESSAGE_ = 'value of optional \'epsg_in\' parameter is not a number'
 DEFAULT_EPSG_OUT_ERROR_MESSAGE_ = 'value of optional \'epsg_out\' parameter is not a number'
 DEFAULT_ERROR_MESSAGE_ = 'value of required \'query\' parameter is neither a valid pair of coordinates (required order: longitude/x,latitude/y) nor a valid Plus code'
-DEFAULT_ERROR_REGIONAL_MESSAGE_ = 'provided regional Plus code is not valid'
+DEFAULT_ERROR_REGIONAL_MESSAGE_ = 'provided regional Plus code is not valid or could not be resolved due to a non-reachable third party API'
 DEFAULT_MAP_ERROR_MESSAGE_ = 'value of required \'bbox\' parameter is not a valid quadruple of coordinates (required order: southwest longitude/x,southwest latitude/y,northeast longitude/x,northeast latitude/y)'
 
 
@@ -85,7 +85,7 @@ def municipality_forward_searcher(municipality_name):
 
   # query Nominatim (via proxy if necessary), process the response and return the centroid pair of coordinates of the first municipality found
   try:
-    response = req.get(municipality_forward_url + query, proxies = app.config['MUNICIPALITY_PROXY']).json() if 'MUNICIPALITY_PROXY' in app.config else req.get(municipality_forward_url + query).json()
+    response = req.get(municipality_forward_url + query, proxies = app.config['MUNICIPALITY_PROXY'], timeout = 3).json() if 'MUNICIPALITY_PROXY' in app.config else req.get(municipality_forward_url + query, timeout = 3).json()
     for response_item in response:
       if response_item['type'] == 'administrative' or response_item['type'] == 'city' or response_item['type'] == 'town':
         return float(response_item['lon']), float(response_item['lat'])
@@ -105,7 +105,7 @@ def municipality_reverse_searcher(x, y, code_local):
 
   # query Nominatim (via proxy if necessary) and return the municipality name
   try:
-    response = req.get(municipality_reverse_url + query, proxies = app.config['MUNICIPALITY_PROXY']).json() if 'MUNICIPALITY_PROXY' in app.config else req.get(municipality_reverse_url + query).json()
+    response = req.get(municipality_reverse_url + query, proxies = app.config['MUNICIPALITY_PROXY'], timeout = 3).json() if 'MUNICIPALITY_PROXY' in app.config else req.get(municipality_reverse_url + query, timeout = 3).json()
     return code_local + ', ' + response['name']
   except:
     return 'not definable'
