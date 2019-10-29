@@ -112,13 +112,10 @@ def municipality_reverse_searcher(x, y, code_local):
 
 
 # reprojects (transforms) a point from one EPSG code to another
-def point_reprojector(epsg_in, epsg_out, source_x, source_y):
-
-  source_projection = p.Proj(init = 'epsg:' + str(epsg_in)) if epsg_out is None else p.Proj(init = 'epsg:' + str(OLC_EPSG_))
-  target_projection = p.Proj(init = 'epsg:' + str(OLC_EPSG_)) if epsg_out is None else p.Proj(init = 'epsg:' + str(epsg_out))
+def point_reprojector(transformer, source_x, source_y):
 
   # return reprojected (transformed) point
-  return p.transform(source_projection, target_projection, source_x, source_y)
+  return transformer.transform(source_x, source_y)
 
 
 # Open Location Code (OLC) handler
@@ -143,7 +140,10 @@ def olc_handler(x, y, query, epsg_in, epsg_out, code_regional):
     # transform if EPSG code of queried pair of coordinates is not equal to default EPSG code of OLC
     if epsg_in != OLC_EPSG_:
       try:
-        x, y = point_reprojector(epsg_in, None, x, y)
+        source_projection = p.Proj(init = 'epsg:' + str(epsg_in))
+        target_projection = p.Proj(init = 'epsg:' + str(OLC_EPSG_))
+        transformer = p.Transformer.from_proj(source_projection, target_projection)
+        x, y = point_reprojector(transformer, x, y)
       except:
         return { 'message': 'transformation of provided pair of coordinates (required order: longitude/x,latitude/y) not possible', 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
     # encode queried pair of coordinates
@@ -171,9 +171,12 @@ def olc_handler(x, y, query, epsg_in, epsg_out, code_regional):
   # transform all pairs of coordinates to be returned if EPSG code for all returned pairs of coordinates is not equal to default EPSG code of OLC, round to six decimals each if not
   if epsg_out != OLC_EPSG_:
     try:
-      center_x, center_y = point_reprojector(None, epsg_out, center_x, center_y)
-      bbox_sw_x, bbox_sw_y = point_reprojector(None, epsg_out, bbox_sw_x, bbox_sw_y)
-      bbox_ne_x, bbox_ne_y = point_reprojector(None, epsg_out, bbox_ne_x, bbox_ne_y)
+      source_projection = p.Proj(init = 'epsg:' + str(OLC_EPSG_))
+      target_projection = p.Proj(init = 'epsg:' + str(epsg_out))
+      transformer = p.Transformer.from_proj(source_projection, target_projection)
+      center_x, center_y = point_reprojector(transformer, center_x, center_y)
+      bbox_sw_x, bbox_sw_y = point_reprojector(transformer, bbox_sw_x, bbox_sw_y)
+      bbox_ne_x, bbox_ne_y = point_reprojector(transformer, bbox_ne_x, bbox_ne_y)
     except Exception as e:
       return { 'message': str(e), 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
   else:
@@ -245,8 +248,11 @@ def olc_loop_handler(min_x, min_y, max_x, max_y, epsg_in, epsg_out, mode):
   # transform if EPSG code of input min/max x/y is not equal to default EPSG code of OLC
   if epsg_in != OLC_EPSG_:
     try:
-      min_x, min_y = point_reprojector(epsg_in, None, min_x, min_y)
-      max_x, max_y = point_reprojector(epsg_in, None, max_x, max_y)
+      source_projection = p.Proj(init = 'epsg:' + str(epsg_in))
+      target_projection = p.Proj(init = 'epsg:' + str(OLC_EPSG_))
+      transformer = p.Transformer.from_proj(source_projection, target_projection)
+      min_x, min_y = point_reprojector(transformer, min_x, min_y)
+      max_x, max_y = point_reprojector(transformer, max_x, max_y)
     except:
       return { 'message': 'transformation of provided quadruple of coordinates (required order: southwest longitude/x,southwest latitude/y,northeast longitude/x,northeast latitude/y) not possible', 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
 
@@ -280,6 +286,12 @@ def olc_loop_handler(min_x, min_y, max_x, max_y, epsg_in, epsg_out, mode):
   
   # prepare list to fill with data and to finally return later on
   data_list = []
+
+  # prepare transformation of center pairs of coordinates if EPSG code for all returned pairs of coordinates is not equal to default EPSG code of OLC
+  if epsg_out != OLC_EPSG_:
+    source_projection = p.Proj(init = 'epsg:' + str(OLC_EPSG_))
+    target_projection = p.Proj(init = 'epsg:' + str(epsg_out))
+    transformer = p.Transformer.from_proj(source_projection, target_projection)
   
   # loop through all lines
   for line in range(num_lines):
@@ -297,7 +309,7 @@ def olc_loop_handler(min_x, min_y, max_x, max_y, epsg_in, epsg_out, mode):
       # transform the center pair of coordinates if EPSG code for all returned pairs of coordinates is not equal to default EPSG code of OLC, round to six decimals if not
       if epsg_out != OLC_EPSG_:
         try:
-          center_x, center_y = point_reprojector(None, epsg_out, center_x, center_y)
+          center_x, center_y = point_reprojector(transformer, center_x, center_y)
         except Exception as e:
           return { 'message': str(e), 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
       else:
