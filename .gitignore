@@ -1,6 +1,3 @@
 # compiled data and cache
 __pycache__/
 *.py[cod]
-
-# WSGI scripts
-*.wsgi

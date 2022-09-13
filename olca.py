@@ -55,8 +55,8 @@ Compress(app)
 def digit_extractor(text):
 
   # return digits if found in text, return (unchanged) text if not
-  if bool(re.search(r'\d', text)):
-    digit_list = re.findall(r'\d+', text)[0]
+  if bool(re.search(r'\d', str(text))):
+    digit_list = re.findall(r'\d+', str(text))[0]
     return ''.join(str(digit) for digit in digit_list)
   else:
     return text
@@ -368,16 +368,18 @@ def request_handler(request, arg_name):
   # cover GET method
   if request.method == 'GET' and arg_name in request.args:
     return request.args[arg_name]
-  else:
+  elif request.method == 'POST':
     # cover POST method with form body
-    if request.method == 'POST' and arg_name in request.form:
+    if arg_name in request.form:
       return request.form[arg_name]
     else:
       # read JSON data (just in case JSON data is provided via POST)
-      request_data = request.get_json()
+      request_data = request.get_json(silent=True)
       # cover POST method with JSON data
       if request.method == 'POST' and request_data is not None and arg_name in request_data:
         return request_data[arg_name]
+  else:
+    return None
 
 
 # response handler

@@ -5,58 +5,45 @@ A web API for converting coordinates to [*Plus codes*](https://plus.codes) of th
 ## Requirements
 
 * [*Python*](https://www.python.org) (v3.x)
-* [*Virtualenv*](https://virtualenv.pypa.io) (for *Python* 3)
-* [*pip*](http://pip.pypa.io) (for *Python* 3)
+* [*Virtualenv*](https://virtualenv.pypa.io) (for *Python* v3.x)
+* [*pip*](http://pip.pypa.io) (for *Python* v3.x)
 
 ## Installation
 
-1.  Create a new virtual *Python* environment, for example:
+1.  Create a new virtual *Python* environment via *Virtualenv*, for example:
 
-        virtualenv -p python3 /usr/local/olca/virtualenv
+        virtualenv /srv/www/htdocs/olca/virtualenv
         
 1.  Clone the project:
 
-        git clone https://github.com/rostock/olca /usr/local/olca/olca
+        git clone https://github.com/rostock/olca /srv/www/htdocs/olca/olca
         
 1.  Activate the virtual *Python* environment:
 
-        source /usr/local/olca/virtualenv/bin/activate
+        source /srv/www/htdocs/olca/virtualenv/bin/activate
         
-1.  Install the required *Python* modules via [*pip*](https://pip.pypa.io), the *Python* package management system:
+1.  Install the required *Python* modules via *pip*:
 
-        pip install -r /usr/local/olca/olca/requirements.txt
+        pip install -r /srv/www/htdocs/olca/olca/requirements.txt
 
 ## Configuration
 
-1.  Edit the general settings file `/usr/local/olca/olca/settings.py`
+Edit the general settings file `/srv/www/htdocs/olca/olca/settings.py`
 
 ## Deployment
 
-If you want to deploy OLCA with [*Apache HTTP Server*](https://httpd.apache.org) you have to make sure that [*mod_wsgi*](https://modwsgi.readthedocs.io) for *Python* 3 is installed, a module that provides a Web Server Gateway Interface (WSGI) compliant interface for hosting *Python* based web applications. Then, you can follow these steps:
+If you want to deploy OLCA with [*Apache HTTP Server*](https://httpd.apache.org) you have to make sure that [*mod_wsgi*](https://modwsgi.readthedocs.io) (for *Python* v3.x) is installed, a module that provides a Web Server Gateway Interface (WSGI) compliant interface for hosting *Python* based web applications. Then, you can follow these steps:
 
-1.  Create a new empty file `olca.wsgi`:
-
-        touch /usr/local/olca/olca/olca.wsgi
-        
-1.  Open `olca.wsgi` and insert the following lines of code:
+Open your *Apache HTTP Server* configuration file and insert something like this (in this example, the virtual *Python* environment uses a *Python* v3.6 interpreter):
     
-        import os
-        activate_this = os.path.join('/usr/local/olca/virtualenv/bin/activate_this.py')
-        with open(activate_this) as file_:
-            exec(file_.read(), dict(__file__=activate_this))
-
-        from olca import app as application
-
-1.  Open your *Apache HTTP Server* configuration file and insert something like this (in this example, the virtual *Python* environment uses a *Python* v3.6 interpreter):
-    
-        WSGIDaemonProcess    olca processes=2 threads=128 python-path=/usr/local/olca/olca:/usr/local/olca/virtualenv/lib/python3.6/site-packages
-        WSGIProcessGroup     olca
-        WSGIScriptAlias      /olca /usr/local/olca/olca/olca.wsgi process-group=olca
-        
-        <Directory /usr/local/olca/olca>
-            Order deny,allow
-            Require all granted
-        </Directory>
+      WSGIDaemonProcess    olca processes=2 threads=128 python-path=/srv/www/htdocs/olca/olca:/srv/www/htdocs/olca/virtualenv/lib/python3.6/site-packages
+      WSGIProcessGroup     olca
+      WSGIScriptAlias      /olca /srv/www/htdocs/olca/olca/olca.wsgi process-group=olca
+      
+      <Directory /srv/www/htdocs/olca/olca>
+          Order deny,allow
+          Require all granted
+      </Directory>
 
 ## Usage
 
