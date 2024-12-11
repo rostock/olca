@@ -26,6 +26,10 @@ MUNICIPALITY_REVERSE_URL = 'https://nominatim.openstreetmap.org/reverse?format=j
 MUNICIPALITY_PROXY = {
   'https': 'http://172.20.100.50:8080',
 }
+# request header(s) for adhering to the terms of use of Nominatim
+CUSTOM_REQUEST_HEADERS = {
+  'User-Agent': 'geodienste@rostock.de'
+}
 
 
 # application (route /map, i.e. the map-like entry point)

@@ -83,9 +83,12 @@ def municipality_forward_searcher(municipality_name):
   # build the query string
   query = '&city=' + municipality_name
 
+  # set request header(s)
+  headers = app.config['CUSTOM_REQUEST_HEADERS']
+
   # query Nominatim (via proxy if necessary), process the response and return the centroid pair of coordinates of the first municipality found
   try:
-    response = req.get(municipality_forward_url + query, proxies = app.config['MUNICIPALITY_PROXY'], timeout = 3).json() if 'MUNICIPALITY_PROXY' in app.config else req.get(municipality_forward_url + query, timeout = 3).json()
+    response = req.get(municipality_forward_url + query, proxies = app.config['MUNICIPALITY_PROXY'], headers = headers, timeout = 3).json() if 'MUNICIPALITY_PROXY' in app.config else req.get(municipality_forward_url + query, headers = headers, timeout = 3).json()
     for response_item in response:
       if response_item['type'] == 'administrative' or response_item['type'] == 'city' or response_item['type'] == 'town':
         return float(response_item['lon']), float(response_item['lat'])
@@ -103,9 +106,12 @@ def municipality_reverse_searcher(x, y, code_local):
   # build the query string
   query = '&lon=' + str(x) + '&lat=' + str(y)
 
+  # set request header(s)
+  headers = app.config['CUSTOM_REQUEST_HEADERS']
+
   # query Nominatim (via proxy if necessary) and return the municipality name
   try:
-    response = req.get(municipality_reverse_url + query, proxies = app.config['MUNICIPALITY_PROXY'], timeout = 3).json() if 'MUNICIPALITY_PROXY' in app.config else req.get(municipality_reverse_url + query, timeout = 3).json()
+    response = req.get(municipality_reverse_url + query, proxies = app.config['MUNICIPALITY_PROXY'], headers = headers, timeout = 3).json() if 'MUNICIPALITY_PROXY' in app.config else req.get(municipality_reverse_url + query, headers = headers, timeout = 3).json()
     return code_local + ', ' + response['name']
   except:
     return 'not definable'
@@ -428,8 +434,10 @@ def query():
     query = re.sub(r'\,+', ',', query)
     # restore the plus sign (wherever it was)
     query = re.sub(r'\,([23456789CFGHJMPQRVWX]{2})$', r'+\1', query)
-    query = re.sub(r'\,([23456789CFGHJMPQRVWX]{2})\,', r'+\1,', query)
+    query = re.sub(r'\,([23456789CFGHJMPQRVWX]{2,3})\,', r'+\1,', query)
     query = re.sub(r'\,$', r'+', query)
+    # cut off characters beyond level 5
+    query = re.sub(r'\+([23456789CFGHJMPQRVWX]{2})[23456789CFGHJMPQRVWX]\,', r'+\1,', query)
   else:
     data = { 'message': 'missing required \'query\' parameter or parameter empty', 'status': HTTP_ERROR_STATUS_ }
     return response_handler(data, HTTP_ERROR_STATUS_, None)
