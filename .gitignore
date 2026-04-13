@@ -1,4 +1,4 @@
-# compiled data and cache
+# Compiled data and cache
 __pycache__/
 *.py[cod]
 

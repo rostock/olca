@@ -284,7 +284,7 @@ def olc_loop_handler(min_x, min_y, max_x, max_y, epsg_in, epsg_out, mode):
   # calculate the precision of level resolution
   level_resolution_precision = len(str(level_resolution - int(level_resolution))[2:])
   # calculate the buffer in degrees to prevent multiple encodings
-  buffer = 10**-(level_resolution_precision) if level_resolution_precision > 1 else 1
+  buffer = 10**-level_resolution_precision if level_resolution_precision > 1 else 1
   # calculate the number of lines (of encodings)
   num_lines = int(math.ceil((round(round(max_y, level_resolution_precision) - round(min_y, level_resolution_precision), level_resolution_precision)) / level_resolution))
   # calculate the number of rows (of encodings)
@@ -431,13 +431,13 @@ def query():
     # convert to upper case
     query = str.upper(query)
     # replace all multiple occurences of query separators in a row with only one query separator each
-    query = re.sub(r'\,+', ',', query)
+    query = re.sub(r',+', ',', query)
     # restore the plus sign (wherever it was)
-    query = re.sub(r'\,([23456789CFGHJMPQRVWX]{2})$', r'+\1', query)
-    query = re.sub(r'\,([23456789CFGHJMPQRVWX]{2,3})\,', r'+\1,', query)
-    query = re.sub(r'\,$', r'+', query)
+    query = re.sub(r',([23456789CFGHJMPQRVWX]{2})$', r'+\1', query)
+    query = re.sub(r',([23456789CFGHJMPQRVWX]{2,3}),', r'+\1,', query)
+    query = re.sub(r',$', r'+', query)
     # cut off characters beyond level 5
-    query = re.sub(r'\+([23456789CFGHJMPQRVWX]{2})[23456789CFGHJMPQRVWX]\,', r'+\1,', query)
+    query = re.sub(r'\+([23456789CFGHJMPQRVWX]{2})[23456789CFGHJMPQRVWX],', r'+\1,', query)
   else:
     data = { 'message': 'missing required \'query\' parameter or parameter empty', 'status': HTTP_ERROR_STATUS_ }
     return response_handler(data, HTTP_ERROR_STATUS_, None)

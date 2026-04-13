@@ -34,7 +34,7 @@ cd olca
 ```bash
 python3 -m venv .venv
 ```
-        
+
 3. Install the required *Python* modules via *pip*:
 
 ```bash

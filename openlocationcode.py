@@ -227,6 +227,38 @@ def isFull(code):
     return True
 
 
+def locationToIntegers(latitude, longitude):
+    """
+    Convert location in degrees into the integer representations.
+
+    This function is exposed for testing purposes and should not be called
+    directly.
+
+    Args:
+      latitude: Latitude in degrees.
+      longitude: Longitude in degrees.
+    Return:
+      A tuple of the [latitude, longitude] values as integers.
+    """
+    latVal = int(math.floor(latitude * FINAL_LAT_PRECISION_))
+    latVal += LATITUDE_MAX_ * FINAL_LAT_PRECISION_
+    if latVal < 0:
+        latVal = 0
+    elif latVal >= 2 * LATITUDE_MAX_ * FINAL_LAT_PRECISION_:
+        latVal = 2 * LATITUDE_MAX_ * FINAL_LAT_PRECISION_ - 1
+
+    lngVal = int(math.floor(longitude * FINAL_LNG_PRECISION_))
+    lngVal += LONGITUDE_MAX_ * FINAL_LNG_PRECISION_
+    if lngVal < 0:
+        # Python's % operator differs from other languages in that it returns
+        # the same sign as the divisor. This means we don't need to add the
+        # range to the result.
+        lngVal = lngVal % (2 * LONGITUDE_MAX_ * FINAL_LNG_PRECISION_)
+    elif lngVal >= 2 * LONGITUDE_MAX_ * FINAL_LNG_PRECISION_:
+        lngVal = lngVal % (2 * LONGITUDE_MAX_ * FINAL_LNG_PRECISION_)
+    return (latVal, lngVal)
+
+
 def encode(latitude, longitude, codeLength=PAIR_CODE_LENGTH_):
     """
     Encode a location into an Open Location Code.
@@ -244,37 +276,22 @@ def encode(latitude, longitude, codeLength=PAIR_CODE_LENGTH_):
       codeLength: The number of significant digits in the output code, not
           including any separator characters.
     """
+    (latInt, lngInt) = locationToIntegers(latitude, longitude)
+    return encodeIntegers(latInt, lngInt, codeLength)
+
+
+def encodeIntegers(latVal, lngVal, codeLength):
+    """
+    Encode a location, as two integer values, into a code.
+
+    This function is exposed for testing purposes and should not be called
+    directly.
+    """
     if codeLength < MIN_DIGIT_COUNT_ or (codeLength < PAIR_CODE_LENGTH_ and
                                          codeLength % 2 == 1):
         raise ValueError('Invalid Open Location Code length - ' +
                          str(codeLength))
     codeLength = min(codeLength, MAX_DIGIT_COUNT_)
-
-    # Compute the code.
-    # This approach converts latitude and longitude to integers. This allows us
-    # to use only integer operations, so avoiding any accumulation of floating
-    # point representation errors.
-
-    # Multiply values by their precision and convert to positive.
-    # Force to integers so the division operations will have integer results.
-    # Note: Python requires rounding before truncating to ensure precision!
-    latVal = int(round(latitude * FINAL_LAT_PRECISION_))
-    latVal += LATITUDE_MAX_ * FINAL_LAT_PRECISION_
-    if latVal < 0:
-        latVal = 0
-    elif latVal >= 2 * LATITUDE_MAX_ * FINAL_LAT_PRECISION_:
-        latVal = 2 * LATITUDE_MAX_ * FINAL_LAT_PRECISION_ - 1
-
-    lngVal = int(round(longitude * FINAL_LNG_PRECISION_))
-    lngVal += LONGITUDE_MAX_ * FINAL_LNG_PRECISION_
-    if lngVal < 0:
-        # Python's % operator differs from other languages in that it returns
-        # the same sign as the divisor. This means we don't need to add the
-        # range to the result.
-        lngVal = lngVal % (2 * LONGITUDE_MAX_ * FINAL_LNG_PRECISION_)
-    elif lngVal >= 2 * LONGITUDE_MAX_ * FINAL_LNG_PRECISION_:
-        lngVal = lngVal % (2 * LONGITUDE_MAX_ * FINAL_LNG_PRECISION_)
-
     # Initialise the code string.
     code = ''
 
