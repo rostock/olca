@@ -38,7 +38,7 @@ LEVEL = 5
 
 # calculates the great circle distance of two geographical points
 def distance_calculator(from_point_x, from_point_y, to_point_x, to_point_y):
-    
+
   from_point_x, from_point_y, to_point_x, to_point_y = map(math.radians, [from_point_x, from_point_y, to_point_x, to_point_y])
   dlon = to_point_x - from_point_x
   dlat = to_point_y - from_point_y
@@ -73,7 +73,7 @@ code_length = level * 2
 # calculate the precision of level resolution
 level_resolution_precision = len(str(level_resolution - int(level_resolution))[2:])
 # calculate the buffer in degrees to prevent multiple encodings
-buffer = 10**-(level_resolution_precision) if level_resolution_precision > 1 else 1
+buffer = 10**-level_resolution_precision if level_resolution_precision > 1 else 1
 # calculate the number of lines (of encodings)
 num_lines = int(math.ceil((round(round(MAX_Y, level_resolution_precision) - round(MIN_Y, level_resolution_precision), level_resolution_precision)) / level_resolution))
 # calculate the number of rows (of encodings)
@@ -89,7 +89,7 @@ if not os.path.exists(TARGET_FOLDER):
 
 # initial counter (needed for progress information output)
 counter = 0
-  
+
 # loop through all lines
 for line in range(num_lines):
   # calculate current y
@@ -117,4 +117,4 @@ for line in range(num_lines):
   temp_file.close()
   # print progress information
   progress_percentage = round(float(counter) / float(num_bboxes) * 100, 2)
-  print str(counter) + ' of ~ ' + str(num_bboxes) + ' processed (~ ' + str(progress_percentage) + ' %)'
+  print(str(counter) + ' of ~ ' + str(num_bboxes) + ' processed (~ ' + str(progress_percentage) + ' %)')

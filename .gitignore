@@ -2,5 +2,11 @@
 __pycache__/
 *.py[cod]
 
-# WSGI scripts
-*.wsgi
+# Editors
+.vscode/
+.idea/
+.zed/
+
+# Virtual Environments
+venv/
+.venv/

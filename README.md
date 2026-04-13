@@ -1,49 +1,69 @@
 # OLCA – Open Location Code API
 
-A web API for converting coordinates to [*Plus codes*](https://plus.codes) of the [*Open Location Code*](https://github.com/google/open-location-code) and vice versa – view it in production: https://geo.sv.rostock.de/olca
+A web API for converting coordinates to [*Plus codes*](https://maps.google.com/pluscodes/) of the [*Open Location Code*](https://github.com/google/open-location-code) and vice versa – view it in production: https://geo.sv.rostock.de/olca
+
+## Table of contents
+
+1. [Requirements](#requirements)
+2. [Installation](#installation)
+3. [Configuration](#configuration)
+4. [Deployment](#deployment)
+5. [Usage](#usage)
+   - [Entry points](#entry-points)
+   - [Request methods](#request-methods)
+   - [Responses](#responses)
+   - [Parameters](#parameters)
+   - [Cross-Origin Resource Sharing](#cross-origin-resource-sharing)
 
 ## Requirements
 
-* [*Python*](https://www.python.org) (v3.x)
-* [*Virtualenv*](https://virtualenv.pypa.io) (for *Python* v3.x)
-* [*pip*](http://pip.pypa.io) (for *Python* v3.x)
+* [*Python*](https://www.python.org/) (>= 3)
+* [*pip*](https://pip.pypa.io/)
 
 ## Installation
-
-1.  Create a new virtual *Python* environment via *Virtualenv*, for example:
-
-        virtualenv /srv/www/htdocs/olca/virtualenv
         
-1.  Clone the project:
+1. Clone the _Git_ repository:
 
-        git clone https://github.com/rostock/olca /srv/www/htdocs/olca/olca
+```bash
+git clone https://github.com/rostock/olca
+cd olca
+```
+
+2. Create a new virtual *Python* environment:
+
+```bash
+python3 -m venv .venv
+```
         
-1.  Activate the virtual *Python* environment:
+3. Install the required *Python* modules via *pip*:
 
-        source /srv/www/htdocs/olca/virtualenv/bin/activate
-        
-1.  Install the required *Python* modules via *pip*:
-
-        pip install -r /srv/www/htdocs/olca/olca/requirements.txt
+```bash
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 
 ## Configuration
 
-Edit the general settings file `/srv/www/htdocs/olca/olca/settings.py`
+Edit the general settings file `settings.py`
 
 ## Deployment
 
-If you want to deploy OLCA with [*Apache HTTP Server*](https://httpd.apache.org) you have to make sure that [*mod_wsgi*](https://modwsgi.readthedocs.io) (for *Python* v3.x) is installed, a module that provides a Web Server Gateway Interface (WSGI) compliant interface for hosting *Python* based web applications. Then, you can follow these steps:
+If you want to deploy OLCA with [*Apache HTTP Server*](https://httpd.apache.org/) you have to make sure that [*mod_wsgi*](https://modwsgi.readthedocs.io) (for *Python* v3.x) is installed, a module that provides a Web Server Gateway Interface (WSGI) compliant interface for hosting *Python* based web applications. Then, you can follow these steps:
 
-Open your *Apache HTTP Server* configuration file and insert something like this (in this example, the virtual *Python* environment uses a *Python* v3.6 interpreter):
-    
-      WSGIDaemonProcess    olca processes=2 threads=128 python-path=/srv/www/htdocs/olca/olca:/srv/www/htdocs/olca/virtualenv/lib/python3.6/site-packages
-      WSGIProcessGroup     olca
-      WSGIScriptAlias      /olca /srv/www/htdocs/olca/olca/olca.wsgi process-group=olca
+Open your *Apache HTTP Server* configuration file and insert something like this (in this example, the virtual *Python* environment uses a *Python* v3.13 interpreter):
+
+```apache
+WSGIDaemonProcess    olca python-path=/path/to/olca:/path/to/.venv/lib64/python3.13/site-packages:/path/to/.venv/lib/python3.13/site-packages
+WSGIProcessGroup     olca
+WSGIScriptAlias      /olca /path/to/olca/wsgi.py process-group=olca
       
-      <Directory /srv/www/htdocs/olca/olca>
-          Order deny,allow
-          Require all granted
-      </Directory>
+<Directory /path/to/olca>
+  <Files wsgi.py>
+    Order deny,allow
+    Require all granted
+  </Files>
+</Directory>
+```
 
 ## Usage
 
@@ -64,15 +84,21 @@ All HTTP request methods share the same parameter names. The parameter names and
 
 Example HTTP `GET` request to the main API entry point:
 
-        curl 'http://127.0.0.1/olca/?query=9F6J33VX+55&epsg_out=25833'
+```bash
+curl 'http://127.0.0.1/olca/?query=9F6J33VX+55&epsg_out=25833'
+```
 
 The same example as an HTTP `POST` request with form data:
 
-        curl -X POST --data 'query=9F6J33VX+55&epsg_out=25833' http://127.0.0.1/olca/
+```bash
+curl -X POST --data 'query=9F6J33VX+55&epsg_out=25833' http://127.0.0.1/olca/
+```
 
 The same example as an HTTP `POST` request with JSON body:
 
-        curl -X POST -H 'Content-Type: application/json' --data '{ "query": "9F6J33VX+55", "epsg_out": 25833}' http://127.0.0.1/olca/
+```bash
+curl -X POST -H 'Content-Type: application/json' --data '{ "query": "9F6J33VX+55", "epsg_out": 25833}' http://127.0.0.1/olca/
+```
 
 ### Responses
 
@@ -84,14 +110,18 @@ A valid JSON document with `status` and `message` is returned in case of any err
 
 Example HTTP `GET` request with missing parameter to the main API entry point:
 
-        curl 'http://127.0.0.1/olca/?epsg_out=25833'
+```bash
+curl 'http://127.0.0.1/olca/?epsg_out=25833'
+```
 
 And the corresponding JSON response:
 
-        {
-          "message": "missing required 'query' parameter or parameter empty",
-          "status": 400
-        }
+```json
+{
+  "message": "missing required 'query' parameter or parameter empty",
+  "status": 400
+}
+```
 
 #### Success
 
@@ -99,55 +129,59 @@ Successful requests result in a valid [GeoJSON](http://geojson.org) document.
 
 Example successful HTTP `POST` request with JSON body to the main API entry point:
 
-        curl -X POST -H 'Content-Type: application/json' --data '{ "query": "310224,5997753", "epsg_in": 25833, "epsg_out": 2398}' http://127.0.0.1/olca/
+```bash
+curl -X POST -H 'Content-Type: application/json' --data '{ "query": "310224,5997753", "epsg_in": 25833, "epsg_out": 2398}' http://127.0.0.1/olca/
+```
 
 And the corresponding GeoJSON response:
 
-        {
-          "geometry": {
-            "coordinates": [
-              [
-                [
-                  4506527.742360309,
-                  5996406.554493488
-                ],
-                [
-                  4506535.901855983,
-                  5996406.554493488
-                ],
-                [
-                  4506535.901855983,
-                  5996420.479254515
-                ],
-                [
-                  4506527.742360309,
-                  5996420.479254515
-                ],
-                [
-                  4506527.742360309,
-                  5996406.554493488
-                ]
-              ]
-            ],
-            "type": "Polygon"
-          },
-          "properties": {
-            "center_x": 4506531.822114297,
-            "center_y": 5996413.516872162,
-            "code_level_1": "9F000000+",
-            "code_level_2": "9F6J0000+",
-            "code_level_3": "9F6J3300+",
-            "code_level_4": "9F6J33VX+",
-            "code_level_5": "9F6J33VX+55",
-            "code_local": "33VX+55",
-            "code_regional": "33VX+55, Rostock",
-            "code_short": "+55",
-            "epsg_in": 25833,
-            "epsg_out": 2398,
-            "level": 5
-          },
-          "type": "Feature"
-        }
+```json
+{
+  "geometry": {
+    "coordinates": [
+      [
+        [
+          4506527.742360309,
+          5996406.554493488
+        ],
+        [
+          4506535.901855983,
+          5996406.554493488
+        ],
+        [
+          4506535.901855983,
+          5996420.479254515
+        ],
+        [
+          4506527.742360309,
+          5996420.479254515
+        ],
+        [
+          4506527.742360309,
+          5996406.554493488
+        ]
+      ]
+    ],
+    "type": "Polygon"
+  },
+  "properties": {
+    "center_x": 4506531.822114297,
+    "center_y": 5996413.516872162,
+    "code_level_1": "9F000000+",
+    "code_level_2": "9F6J0000+",
+    "code_level_3": "9F6J3300+",
+    "code_level_4": "9F6J33VX+",
+    "code_level_5": "9F6J33VX+55",
+    "code_local": "33VX+55",
+    "code_regional": "33VX+55, Rostock",
+    "code_short": "+55",
+    "epsg_in": 25833,
+    "epsg_out": 2398,
+    "level": 5
+  },
+  "type": "Feature"
+}
+```
 
 ### Parameters
 

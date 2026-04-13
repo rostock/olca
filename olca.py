@@ -31,7 +31,7 @@ DEFAULT_MAP_ERROR_MESSAGE_ = 'value of required \'bbox\' parameter is not a vali
 
 
 
-# initialise application
+# initialize application
 
 app = Flask(__name__)
 
@@ -64,7 +64,7 @@ def digit_extractor(text):
 
 # calculates the great circle distance of two geographical points
 def distance_calculator(from_point_x, from_point_y, to_point_x, to_point_y):
-    
+
   from_point_x, from_point_y, to_point_x, to_point_y = map(math.radians, [from_point_x, from_point_y, to_point_x, to_point_y])
   dlon = to_point_x - from_point_x
   dlat = to_point_y - from_point_y
@@ -140,7 +140,7 @@ def olc_handler(x, y, query, epsg_in, epsg_out, code_regional):
         return { 'message': DEFAULT_ERROR_REGIONAL_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
     except:
       return { 'message': DEFAULT_ERROR_REGIONAL_MESSAGE_, 'status': HTTP_ERROR_STATUS_ }, HTTP_ERROR_STATUS_
-  
+
   # if a pair of coordinates was queried…
   if query is None:
     # transform if EPSG code of queried pair of coordinates is not equal to default EPSG code of OLC
@@ -161,7 +161,7 @@ def olc_handler(x, y, query, epsg_in, epsg_out, code_regional):
 
   # take care of short Plus code if necessary
   code = code.split(olc.SEPARATOR_)[0].ljust(8, olc.PADDING_CHARACTER_) + olc.SEPARATOR_ if olc.isShort(code) else code
-  
+
   # determine the level
   level = len(code.replace(olc.SEPARATOR_, '').rstrip(olc.PADDING_CHARACTER_)) / 2
 
@@ -173,7 +173,7 @@ def olc_handler(x, y, query, epsg_in, epsg_out, code_regional):
 
   # get the full Plus code
   code = olc.encode(center_y, center_x)
-  
+
   # transform all pairs of coordinates to be returned if EPSG code for all returned pairs of coordinates is not equal to default EPSG code of OLC, round to six decimals each if not
   if epsg_out != OLC_EPSG_:
     try:
@@ -244,7 +244,7 @@ def olc_handler(x, y, query, epsg_in, epsg_out, code_regional):
 
 # OLC loop handler
 def olc_loop_handler(min_x, min_y, max_x, max_y, epsg_in, epsg_out, mode):
-  
+
   # return points only if in labels mode, polygons if not
   if mode == 'labels':
     points_only = True
@@ -289,7 +289,7 @@ def olc_loop_handler(min_x, min_y, max_x, max_y, epsg_in, epsg_out, mode):
   num_lines = int(math.ceil((round(round(max_y, level_resolution_precision) - round(min_y, level_resolution_precision), level_resolution_precision)) / level_resolution))
   # calculate the number of rows (of encodings)
   num_rows = int(math.ceil((round(round(max_x, level_resolution_precision) - round(min_x, level_resolution_precision), level_resolution_precision)) / level_resolution))
-  
+
   # prepare list to fill with data and to finally return later on
   data_list = []
 
@@ -298,7 +298,7 @@ def olc_loop_handler(min_x, min_y, max_x, max_y, epsg_in, epsg_out, mode):
     source_projection = p.Proj(init = 'epsg:' + str(OLC_EPSG_))
     target_projection = p.Proj(init = 'epsg:' + str(epsg_out))
     transformer = p.Transformer.from_proj(source_projection, target_projection)
-  
+
   # loop through all lines
   for line in range(num_lines):
     # calculate current y
